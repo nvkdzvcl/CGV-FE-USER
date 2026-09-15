@@ -1,0 +1,53 @@
+:root {
+  /* Background Colors */
+  --bg-main: #0b0f19;
+  --bg-secondary: #0f1422;
+  --bg-surface: #121826;
+  --bg-surface-hover: #182236;
+  --bg-card: rgba(18, 24, 38, 0.85);
+  --bg-card-hover: rgba(26, 35, 54, 0.95);
+  --bg-glass: rgba(18, 24, 38, 0.75);
+  --bg-input: #151c2e;
+
+  /* Primary Accent & Gradients */
+  --primary: #ff2b54;
+  --primary-hover: #ff476d;
+  --primary-active: #e11d48;
+  --primary-glow: rgba(255, 43, 84, 0.35);
+  --primary-gradient: linear-gradient(135deg, #ff2b54 0%, #d91b42 50%, #9333ea 100%);
+  --secondary-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gold-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+
+  /* Text Colors */
+  --text-main: #ffffff;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-accent: #ff476d;
+
+  /* Tier Colors */
+  --tier-silver: #94a3b8;
+  --tier-gold: #fbbf24;
+  --tier-platinum: #c084fc;
+
+  /* Borders & Shadows */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  --border-primary: rgba(255, 43, 84, 0.4);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 25px rgba(255, 43, 84, 0.25);
+
+  /* Dimensions & Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+  --container-max: 1380px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}

@@ -1,0 +1,35 @@
+.movies-header {
+  margin-bottom: 24px;
+}
+.movies-grid-full {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+.active-filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.active-filter-pill {
+  background: rgba(255, 43, 84, 0.15);
+  border: 1px solid rgba(255, 43, 84, 0.3);
+  color: #fff;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-clear-filters {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.btn-clear-filters:hover {
+  color: #fff;
+}
