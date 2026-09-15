@@ -71,7 +71,7 @@ export default function PromotionsPage() {
               <Flame size={12} /> Hot deal độc quyền
             </span>
             <h2 className="promo-mega-title">MEGA SALE THỨ 4</h2>
-            <div className="promo-mega-sub">Đồng giá vé chỉ từ 55K trên toàn hệ thống CineGo</div>
+            <div className="promo-mega-sub">Đồng giá vé chỉ từ 55K trên toàn hệ thống CGV</div>
             <p className="promo-mega-desc">
               Săn ưu đãi giữa tuần với giá vé siêu tốt, áp dụng cho tất cả các suất chiếu 2D tiêu chuẩn từ sáng đến tối.
             </p>

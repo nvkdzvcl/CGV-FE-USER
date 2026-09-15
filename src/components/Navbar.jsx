@@ -21,7 +21,7 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
           <div className="brand-icon">
             <Film size={22} />
           </div>
-          <span>CineGo</span>
+          <span>CGV</span>
         </NavLink>
 
         {/* Navigation Links */}

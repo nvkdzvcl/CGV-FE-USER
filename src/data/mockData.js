@@ -10,7 +10,7 @@ export const REGIONS = [
 export const CINEMAS = [
   {
     id: 'cin-01',
-    name: 'CineGo Landmark 81',
+    name: 'CGV Landmark 81',
     regionId: 2,
     address: 'Tầng B1, Vincom Landmark 81, 720A Điện Biên Phủ, P. 22, Q. Bình Thạnh, TP.HCM',
     distance: '1.2 km',
@@ -23,7 +23,7 @@ export const CINEMAS = [
   },
   {
     id: 'cin-02',
-    name: 'CineGo Vincom Đồng Khởi',
+    name: 'CGV Vincom Đồng Khởi',
     regionId: 2,
     address: '72 Lê Thánh Tôn, Bến Nghé, Quận 1, TP. Hồ Chí Minh',
     distance: '2.1 km',
@@ -35,7 +35,7 @@ export const CINEMAS = [
   },
   {
     id: 'cin-03',
-    name: 'CineGo Giga Mall',
+    name: 'CGV Giga Mall',
     regionId: 2,
     address: '240-242 Phạm Văn Đồng, Hiệp Bình Chánh, TP. Thủ Đức, TP.HCM',
     distance: '5.3 km',
@@ -47,7 +47,7 @@ export const CINEMAS = [
   },
   {
     id: 'cin-04',
-    name: 'CineGo Crescent Mall',
+    name: 'CGV Crescent Mall',
     regionId: 2,
     address: '101 Tôn Dật Tiên, Tân Phú, Quận 7, TP. Hồ Chí Minh',
     distance: '6.8 km',
@@ -59,7 +59,7 @@ export const CINEMAS = [
   },
   {
     id: 'cin-05',
-    name: 'CineGo Aeon Tân Phú',
+    name: 'CGV Aeon Tân Phú',
     regionId: 2,
     address: '30 Bờ Bao Tân Thắng, Sơn Kỳ, Tân Phú, TP. Hồ Chí Minh',
     distance: '7.1 km',
@@ -71,7 +71,7 @@ export const CINEMAS = [
   },
   {
     id: 'cin-06',
-    name: 'CineGo Sala',
+    name: 'CGV Sala',
     regionId: 2,
     address: 'Khu đô thị Sala, Mai Chí Thọ, An Lợi Đông, TP. Thủ Đức, TP.HCM',
     distance: '8.4 km',
@@ -254,7 +254,7 @@ export const PROMOTIONS = [
     id: 'pr-02',
     title: 'Mua 1 Tặng 1 Giữa Tuần',
     discountPill: 'MUA 1 TẶNG 1',
-    desc: 'Áp dụng cho suất chiếu đầu ngày từ Thứ 2 đến Thứ 5 cho tất cả thành viên CineGo.',
+    desc: 'Áp dụng cho suất chiếu đầu ngày từ Thứ 2 đến Thứ 5 cho tất cả thành viên CGV.',
     validTo: '30.09.2026',
     category: 'Vé xem phim',
     tier: 'MEMBER',
@@ -262,7 +262,7 @@ export const PROMOTIONS = [
   },
   {
     id: 'pr-03',
-    title: 'Sinh Nhật CineGo — Quà Bất Ngờ',
+    title: 'Sinh Nhật CGV — Quà Bất Ngờ',
     discountPill: 'SINH NHẬT',
     desc: 'Tặng ngay vé 2D miễn phí và bắp ngọt trong tháng sinh nhật của thành viên VIP & VVIP.',
     validTo: 'Không giới hạn',

@@ -22,21 +22,21 @@ export default function AuthModal({ initialTab = 'login', onClose, onLoginSucces
   const handleQuickDemo = (role) => {
     let demoUser = {
       fullName: 'Khách hàng VIP',
-      email: 'vip.customer@cinego.vn',
+      email: 'vip.customer@cgv.vn',
       tier: 'VIP',
       loyaltyPoints: 15400
     };
     if (role === 'vvip') {
       demoUser = {
         fullName: 'Hội viên Bạch Kim (Platinum)',
-        email: 'vvip.member@cinego.vn',
+        email: 'vvip.member@cgv.vn',
         tier: 'VVIP',
         loyaltyPoints: 42000
       };
     } else if (role === 'admin') {
       demoUser = {
         fullName: 'Quản trị viên Hệ thống',
-        email: 'admin@cinego.vn',
+        email: 'admin@cgv.vn',
         tier: 'ADMIN',
         loyaltyPoints: 99999
       };
@@ -56,7 +56,7 @@ export default function AuthModal({ initialTab = 'login', onClose, onLoginSucces
         </button>
 
         <h3 style={{ fontSize: '1.4rem', color: '#fff', marginBottom: 18, textAlign: 'center' }}>
-          Chào mừng đến CineGo
+          Chào mừng đến CGV
         </h3>
 
         <div className="auth-tabs">

@@ -12,7 +12,7 @@ import PromotionsPage from './pages/PromotionsPage';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('cinego_user');
+    const saved = localStorage.getItem('cgv_user');
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -29,13 +29,13 @@ export default function App() {
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
-    localStorage.setItem('cinego_user', JSON.stringify(user));
+    localStorage.setItem('cgv_user', JSON.stringify(user));
   };
 
   const handleLogout = () => {
     if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
       setCurrentUser(null);
-      localStorage.removeItem('cinego_user');
+      localStorage.removeItem('cgv_user');
     }
   };
 
