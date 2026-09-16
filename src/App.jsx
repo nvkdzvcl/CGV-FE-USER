@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import SeatPickerModal from './components/SeatPickerModal';
@@ -9,6 +9,27 @@ import HomePage from './pages/HomePage';
 import MoviesPage from './pages/MoviesPage';
 import CinemasPage from './pages/CinemasPage';
 import PromotionsPage from './pages/PromotionsPage';
+
+// Animated Route Container
+function AnimatedRoutes({ onOpenBooking }) {
+  const location = useLocation();
+
+  // Smooth scroll to top when page changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
+
+  return (
+    <div key={location.pathname} className="page-transition-wrapper">
+      <Routes location={location}>
+        <Route path="/" element={<HomePage onOpenBooking={onOpenBooking} />} />
+        <Route path="/movies" element={<MoviesPage onOpenBooking={onOpenBooking} />} />
+        <Route path="/cinemas" element={<CinemasPage onOpenBooking={onOpenBooking} />} />
+        <Route path="/promotions" element={<PromotionsPage />} />
+      </Routes>
+    </div>
+  );
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -57,12 +78,7 @@ export default function App() {
         />
 
         <main className="main-content">
-          <Routes>
-            <Route path="/" element={<HomePage onOpenBooking={handleOpenBooking} />} />
-            <Route path="/movies" element={<MoviesPage onOpenBooking={handleOpenBooking} />} />
-            <Route path="/cinemas" element={<CinemasPage onOpenBooking={handleOpenBooking} />} />
-            <Route path="/promotions" element={<PromotionsPage />} />
-          </Routes>
+          <AnimatedRoutes onOpenBooking={handleOpenBooking} />
         </main>
 
         <Footer />

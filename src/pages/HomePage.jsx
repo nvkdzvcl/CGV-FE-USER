@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Play, Ticket, Star, ChevronRight, Sparkles } from 'lucide-react';
+import { Flame, Play, Ticket, Star, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 import QuickBooking from '../components/QuickBooking';
 import MovieCard from '../components/MovieCard';
 import { MOVIES, CINEMAS } from '../data/mockData';
@@ -14,6 +14,27 @@ export default function HomePage({ onOpenBooking }) {
   const comingSoon = MOVIES.filter(m => m.showingStatus === 'COMING_SOON');
   const topMovies = [...nowShowing].sort((a, b) => b.rating - a.rating).slice(0, 5);
 
+  const autoPlayRef = useRef(null);
+
+  // Auto-play slide transition every 5 seconds
+  useEffect(() => {
+    autoPlayRef.current = setInterval(() => {
+      setHeroIdx(prev => (prev + 1) % heroMovies.length);
+    }, 5000);
+
+    return () => {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    };
+  }, [heroMovies.length]);
+
+  const handlePrevSlide = () => {
+    setHeroIdx(prev => (prev - 1 + heroMovies.length) % heroMovies.length);
+  };
+
+  const handleNextSlide = () => {
+    setHeroIdx(prev => (prev + 1) % heroMovies.length);
+  };
+
   const handleHeroBook = () => {
     onOpenBooking({
       movie: currentHero,
@@ -25,16 +46,25 @@ export default function HomePage({ onOpenBooking }) {
 
   return (
     <div className="home-page">
-      {/* Hero Section */}
-      <section className="hero-section">
+      {/* Hero Section with Cinematic Transition */}
+      <section
+        className="hero-section"
+        onMouseEnter={() => autoPlayRef.current && clearInterval(autoPlayRef.current)}
+        onMouseLeave={() => {
+          autoPlayRef.current = setInterval(() => {
+            setHeroIdx(prev => (prev + 1) % heroMovies.length);
+          }, 5000);
+        }}
+      >
         <img
+          key={currentHero.id + '-backdrop'}
           src={currentHero.backdropUrl}
           alt={currentHero.title}
-          className="hero-backdrop"
+          className="hero-backdrop hero-backdrop-transition"
         />
         <div className="hero-overlay" />
         
-        <div className="hero-content">
+        <div key={currentHero.id + '-content'} className="hero-content hero-content-transition">
           <div className="hero-badge">
             <span className="badge-tag">
               <Flame size={12} /> Phim đang chiếu
@@ -72,7 +102,15 @@ export default function HomePage({ onOpenBooking }) {
           </div>
         </div>
 
-        {/* Carousel indicators */}
+        {/* Carousel Prev / Next Arrow controls */}
+        <button className="hero-nav-arrow prev" onClick={handlePrevSlide} title="Phim trước">
+          <ChevronLeft size={22} />
+        </button>
+        <button className="hero-nav-arrow next" onClick={handleNextSlide} title="Phim kế tiếp">
+          <ChevronRight size={22} />
+        </button>
+
+        {/* Carousel Dots indicator */}
         <div className="hero-dots">
           {heroMovies.map((_, i) => (
             <div
@@ -175,7 +213,6 @@ export default function HomePage({ onOpenBooking }) {
               </div>
             ))}
 
-            {/* Special Promo Card */}
             <div className="special-promo-card">
               <div className="special-promo-title">Ưu đãi đặc biệt</div>
               <div className="special-promo-desc">Combo bắp nước giảm đến 50%</div>
