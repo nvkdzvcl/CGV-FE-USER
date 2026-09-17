@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Search, Film, User, LogIn, Crown, Sparkles, Check } from 'lucide-react';
+import { Search, Film, User, Crown } from 'lucide-react';
 
 export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -12,6 +12,19 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
       navigate(`/movies?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
+
+  // Lấy chữ cái đầu để hiển thị avatar
+  const avatarLetter = currentUser?.fullName
+    ? currentUser.fullName[0].toUpperCase()
+    : currentUser?.email
+      ? currentUser.email[0].toUpperCase()
+      : 'U';
+
+  // Tier label
+  const tierLabel = currentUser?.membershipTier?.code || currentUser?.tier || 'MEMBER';
+
+  // Loyalty points (total_spend_ytd hoặc loyaltyPoints fallback)
+  const points = currentUser?.total_spend_ytd ?? currentUser?.loyaltyPoints ?? 0;
 
   return (
     <nav className="navbar">
@@ -42,7 +55,7 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
 
         {/* Right Actions */}
         <div className="navbar-actions">
-          {/* Live Search */}
+          {/* Search */}
           <form className="search-box" onSubmit={handleSearchSubmit}>
             <Search size={16} className="search-icon" />
             <input
@@ -57,14 +70,14 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
           {/* User Auth */}
           {currentUser ? (
             <div className="user-badge" onClick={onLogout} title="Bấm để đăng xuất">
-              <div className="user-avatar">
-                {currentUser.fullName ? currentUser.fullName[0].toUpperCase() : 'U'}
-              </div>
+              <div className="user-avatar">{avatarLetter}</div>
               <div className="user-info">
-                <span className="user-name">{currentUser.fullName}</span>
+                <span className="user-name">
+                  {currentUser.fullName || currentUser.email || 'Thành viên'}
+                </span>
                 <span className="user-tier">
                   <Crown size={12} style={{ display: 'inline', marginRight: 3 }} />
-                  {currentUser.tier || 'MEMBER'} • {currentUser.loyaltyPoints || 0} pts
+                  {tierLabel} • {Number(points).toLocaleString('vi-VN')} pts
                 </span>
               </div>
             </div>

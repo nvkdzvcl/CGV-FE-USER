@@ -10,6 +10,7 @@ import './styles/cinemas.css';
 import './styles/promotions.css';
 import './styles/seat-booking.css';
 import './styles/auth-modal.css';
+import './styles/toast.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
