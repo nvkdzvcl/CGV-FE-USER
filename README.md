@@ -1,4 +1,4 @@
-# 🎬 CineGo Frontend (CGV-FE-USER)
+# 🎬 CGV Frontend (CGV-FE-USER)
 
 > Giao diện Web Người Dùng Đặt Vé Xem Phim Trực Tuyến Hiện Đại (Modern Cinema Booking SPA).
 > Tương thích kiến trúc Microservices CGV Enterprise.
@@ -19,7 +19,7 @@
 
 3. **Cụm Rạp & Lịch Chiếu (`/cinemas`):**
    - Lọc cụm rạp theo khu vực (TP. Hồ Chí Minh, Hà Nội, Đà Nẵng...) và tiện ích (IMAX, 4DX, Dolby Atmos, Ghế đôi).
-   - Banner Spotlight rạp nổi bật (CineGo Landmark 81).
+   - Banner Spotlight rạp nổi bật (CGV Landmark 81).
    - Lịch chiếu phim trực quan theo ngày: Bấm vào khung giờ để chuyển sang sơ đồ chọn ghế.
 
 4. **Ưu Đãi & Hội Viên (`/promotions`):**

@@ -47,10 +47,13 @@
   color: #ffffff;
 }
 
+/* Navbar Links with Sliding Indicator */
 .navbar-links {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 28px;
+  padding-bottom: 4px;
 }
 
 .nav-link {
@@ -58,25 +61,29 @@
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text-secondary);
-  padding: 8px 0;
-  transition: color var(--transition-fast);
+  padding: 8px 4px;
+  transition: color 0.25s ease, transform 0.2s ease;
+  user-select: none;
 }
 .nav-link:hover {
   color: #ffffff;
+  transform: translateY(-1px);
 }
 .nav-link.active {
   color: #ffffff;
+  font-weight: 700;
 }
-.nav-link.active::after {
-  content: '';
+
+/* Animated Sliding Indicator */
+.nav-sliding-indicator {
   position: absolute;
   bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2.5px;
-  background: var(--primary);
-  border-radius: 2px;
-  box-shadow: 0 0 8px var(--primary);
+  height: 3px;
+  background: var(--primary-gradient);
+  border-radius: 3px;
+  box-shadow: 0 0 12px var(--primary);
+  transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
 }
 
 .navbar-actions {

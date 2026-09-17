@@ -248,3 +248,28 @@ button {
   accent-color: var(--primary);
   cursor: pointer;
 }
+
+/* Modern Page Transition Animation */
+.page-transition-wrapper {
+  animation: pageFadeSlideUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform, filter;
+}
+
+@keyframes pageFadeSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Native View Transition Polyfill rules */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.35s;
+}
