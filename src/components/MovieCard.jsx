@@ -29,6 +29,8 @@ export default function MovieCard({ movie, onBookTicket }) {
     }
   };
 
+  const genreText = movie.genre?.slice(0, 2).join(", ") || "Điện ảnh";
+
   return (
     <>
       <div className="movie-card">
@@ -44,9 +46,9 @@ export default function MovieCard({ movie, onBookTicket }) {
                 onClick={handleOpenTrailer}
                 title="Xem nhanh Trailer"
               >
-                <Play size={20} fill="#fff" />
+                <Play size={22} fill="#fff" />
               </button>
-              <span className="movie-play-overlay-text">Chi tiết & Trailer</span>
+              <span className="movie-play-overlay-text">Xem Trailer</span>
             </div>
           </Link>
 
@@ -59,7 +61,7 @@ export default function MovieCard({ movie, onBookTicket }) {
                   Đang chiếu
                 </>
               ) : (
-                movie.releaseDate ? `Dự kiến ${movie.releaseDate}` : "Sắp chiếu"
+                movie.releaseDate ? `Khởi chiếu ${movie.releaseDate}` : "Sắp chiếu"
               )}
             </span>
 
@@ -76,27 +78,23 @@ export default function MovieCard({ movie, onBookTicket }) {
 
         <div className="movie-info">
           <h4 className="movie-title">
-            {movie.ageRating && (
-              <span className={`age-chip ${ageInfo.className}`} title={ageInfo.name}>
-                {ageInfo.label}
-              </span>
-            )}
             <Link to={`/movies/${movie.id}`} className="movie-title-link" title={movie.title}>
               <span className="movie-title-text">{movie.title}</span>
             </Link>
           </h4>
           
-          <div className="movie-stats">
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <Clock size={13} /> {movie.duration} phút
+          {/* Clean Typographic Sub-Info (No boxy clutter) */}
+          <div className="movie-meta-line">
+            <span className="movie-meta-genre">{genreText}</span>
+            <span className="meta-dot">•</span>
+            <span className="movie-meta-duration">
+              <Clock size={12} /> {movie.duration} phút
             </span>
-            <span className="movie-format-pill">2D Phụ đề</span>
           </div>
 
-          <div className="movie-genres">
-            {movie.genre?.slice(0, 2).map((g, i) => (
-              <span key={i} className="badge-outline">{g}</span>
-            ))}
+          <div className="movie-sub-badges">
+            <span className="movie-format-pill">2D Phụ đề</span>
+            {movie.country && <span className="movie-country-text">{movie.country}</span>}
           </div>
 
           {isNowShowing ? (
@@ -120,7 +118,7 @@ export default function MovieCard({ movie, onBookTicket }) {
           ) : (
             <Link
               to={`/movies/${movie.id}`}
-              className="btn-book-ticket"
+              className="btn-book-ticket btn-coming-soon"
               style={{ textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
             >
               <Play size={14} fill="#fff" />
