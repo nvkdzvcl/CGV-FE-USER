@@ -117,8 +117,7 @@ export function AuthProvider({ children }) {
    */
   const updateUser = useCallback((updates) => {
     setCurrentUser((prev) => {
-      if (!prev) return prev;
-      const updated = { ...prev, ...updates };
+      const updated = prev ? { ...prev, ...updates } : { ...updates };
       saveUser(updated);
       return updated;
     });

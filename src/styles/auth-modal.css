@@ -513,3 +513,44 @@
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
+
+/* ── Forgot Password Styles ── */
+.auth-forgot-link {
+  background: none;
+  border: none;
+  color: var(--primary-hover);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.auth-forgot-link:hover {
+  text-decoration: underline;
+  color: #ff6584;
+}
+
+.auth-step-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.auth-step-desc strong {
+  color: #ffffff;
+}
+
+.forgot-password-wrap {
+  animation: modalSlideUp 0.25s ease;
+}
+/* Mobile responsiveness for Auth Modal */
+@media (max-width: 480px) {
+  .auth-modal-box {
+    padding: 24px 18px;
+    border-radius: 14px;
+    max-width: 95vw;
+  }
+}

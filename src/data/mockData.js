@@ -91,18 +91,61 @@ export const MOVIES = [
     director: 'Gareth Edwards',
     cast: 'Scarlett Johansson, Jonathan Bailey, Mahershala Ali',
     genre: ['Hành động', 'Phiêu lưu', 'Khoa học viễn tưởng'],
-    language: 'Tiếng Anh - Phụ đề Tiếng Việt',
+    language: 'Tiếng Anh',
+    subtitle: 'Phụ đề Tiếng Việt',
     country: 'Mỹ',
     ageRating: 'T16',
     duration: 135,
-    rating: 8.8,
-    votes: '14.2k',
     showingStatus: 'NOW_SHOWING',
     releaseDate: '04.07.2025',
+    endDate: '28.08.2025',
     posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop',
     backdropUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1400&auto=format&fit=crop',
     trailerUrl: 'https://www.youtube.com/watch?v=fb5ELWi-ekk',
-    synopsis: 'Khi một âm mưu bí ẩn đe dọa sự sống còn của loài người, những sinh vật tiền sử một lần nữa trỗi dậy từ những hòn đảo cô lập để đối đầu với nền văn minh nhân loại.'
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/fb5ELWi-ekk',
+    synopsis: 'Năm năm sau các sự kiện của Jurassic World Dominion, hệ sinh thái của Trái Đất phần lớn đã chứng minh không thể phù hợp cho khủng long. Những sinh vật còn sót lại tồn tại trong các môi trường xích đạo bị cô lập. Ba trong số những sinh vật khổng lồ nhất trong quần thể nhiệt đới này nắm giữ chìa khóa để điều chế một loại thuốc sinh học mang lại lợi ích thần kỳ cho nhân loại. Một đội đặc nhiệm tinh nhuệ được phái đến hòn đảo bí mật để thu thập mẫu ADN từ các loài bò sát tiền sử nguy hiểm bậc nhất hành tinh.',
+    casts: [
+      {
+        id: 'c-01',
+        actorName: 'Gareth Edwards',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-02',
+        actorName: 'Scarlett Johansson',
+        characterName: 'Zora Bennett',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-03',
+        actorName: 'Jonathan Bailey',
+        characterName: 'Dr. Henry Loomis',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      },
+      {
+        id: 'c-04',
+        actorName: 'Mahershala Ali',
+        characterName: 'Duncan Kincaid',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop',
+        displayOrder: 3
+      },
+      {
+        id: 'c-05',
+        actorName: 'Rupert Friend',
+        characterName: 'Martin Krebs',
+        roleType: 'SUPPORTING',
+        avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&auto=format&fit=crop',
+        displayOrder: 4
+      }
+    ]
   },
   {
     id: 'mov-02',
@@ -112,16 +155,52 @@ export const MOVIES = [
     cast: 'Hoàng Dũng, Diệu Nhi, Trấn Thành (lồng tiếng)',
     genre: ['Hoạt hình', 'Phiêu lưu', 'Gia đình'],
     language: 'Tiếng Việt',
+    subtitle: 'Không có (Phim lồng tiếng gốc)',
     country: 'Việt Nam',
     ageRating: 'P',
     duration: 95,
-    rating: 8.5,
-    votes: '8.2k',
     showingStatus: 'NOW_SHOWING',
     releaseDate: '10.07.2025',
+    endDate: '15.09.2025',
     posterUrl: 'https://images.unsplash.com/photo-1535083783855-76ae62b2914e?w=600&auto=format&fit=crop',
     backdropUrl: 'https://images.unsplash.com/photo-1535083783855-76ae62b2914e?w=1400&auto=format&fit=crop',
-    synopsis: 'Chuyến hành trình kỳ thú của Dế Mèn và những người bạn băng qua thảo nguyên bao la để tìm lại nguồn nước thần cứu sống cư dân xóm Đầm Lầy.'
+    trailerUrl: 'https://www.youtube.com/watch?v=kY382w3wB64',
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/kY382w3wB64',
+    synopsis: 'Lấy cảm hứng từ tác phẩm văn học kinh điển Dế Mèn Phiêu Lưu Ký, bộ phim đưa khán giả vào hành trình trưởng thành đầy hài hước và xúc động của chú Dế Mèn kiêu hãnh. Sau bài học nhớ đời về sự ngông cuồng, Mèn cùng người bạn đường chí cốt Dế Trũi vượt qua đầm lầy hiểm trở, đương đầu với băng cướp Cóc Đen để giải cứu cư dân xóm Bờ Cỏ.',
+    casts: [
+      {
+        id: 'c-11',
+        actorName: 'Nguyễn Đăng Quang',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-12',
+        actorName: 'Hoàng Dũng',
+        characterName: 'Dế Mèn (Lồng tiếng)',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-13',
+        actorName: 'Diệu Nhi',
+        characterName: 'Bướm Hoa (Lồng tiếng)',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      },
+      {
+        id: 'c-14',
+        actorName: 'Trấn Thành',
+        characterName: 'Dế Trũi (Lồng tiếng)',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop',
+        displayOrder: 3
+      }
+    ]
   },
   {
     id: 'mov-03',
@@ -131,16 +210,52 @@ export const MOVIES = [
     cast: 'Thái Hòa, Thu Trang, Kiều Minh Tuấn',
     genre: ['Tình cảm', 'Hài hước', 'Tâm lý'],
     language: 'Tiếng Việt',
+    subtitle: 'Tiếng Anh',
     country: 'Việt Nam',
     ageRating: 'T13',
     duration: 108,
-    rating: 7.8,
-    votes: '6.4k',
     showingStatus: 'NOW_SHOWING',
     releaseDate: '15.07.2025',
-    posterUrl: 'https://images.unsplash.com/photo-1518173946687-a4c8a383392e?w=600&auto=format&fit=crop',
-    backdropUrl: 'https://images.unsplash.com/photo-1518173946687-a4c8a383392e?w=1400&auto=format&fit=crop',
-    synopsis: 'Một kỳ nghỉ bất đắc dĩ tại vùng quê Đà Lạt đã gắn kết những con người xa lạ trở thành gia đình ấm áp cùng những tình huống dở khóc dở cười.'
+    endDate: '20.09.2025',
+    posterUrl: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&auto=format&fit=crop',
+    backdropUrl: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=1400&auto=format&fit=crop',
+    trailerUrl: 'https://www.youtube.com/watch?v=7wtfhZwyrcc',
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/7wtfhZwyrcc',
+    synopsis: 'Một kỳ nghỉ bất đắc dĩ tại vùng thung lũng Đà Lạt thơ mộng kéo dài đúng 7 ngày đã gắn kết những con người xa lạ có tính cách trái ngược hoàn toàn. Từ những xung đột nảy lửa ban đầu, họ dần thấu hiểu những tổn thương và khoảng lặng của nhau, để rồi tìm lại được niềm tin yêu cuộc sống và giá trị đích thực của tình thân gia đình.',
+    casts: [
+      {
+        id: 'c-21',
+        actorName: 'Vũ Ngọc Đãng',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-22',
+        actorName: 'Thái Hòa',
+        characterName: 'Ông Ba',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-23',
+        actorName: 'Thu Trang',
+        characterName: 'Bà Mai',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      },
+      {
+        id: 'c-24',
+        actorName: 'Kiều Minh Tuấn',
+        characterName: 'Hoàng Long',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop',
+        displayOrder: 3
+      }
+    ]
   },
   {
     id: 'mov-04',
@@ -150,16 +265,52 @@ export const MOVIES = [
     cast: 'Việt Hương, Trung Dân, Dạ Chúc',
     genre: ['Kinh dị', 'Bí ẩn', 'Tâm lý'],
     language: 'Tiếng Việt',
+    subtitle: 'Tiếng Anh',
     country: 'Việt Nam',
     ageRating: 'T18',
     duration: 112,
-    rating: 6.9,
-    votes: '4.1k',
     showingStatus: 'NOW_SHOWING',
     releaseDate: '16.07.2025',
+    endDate: '30.09.2025',
     posterUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop',
     backdropUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1400&auto=format&fit=crop',
-    synopsis: 'Những truyền thuyết dân gian rùng rợn vùng sông nước Tây Nam Bộ sống dậy khi một người phụ nữ làm nghề vớt xác vô tình kéo lên một oan hồn đòi mạng.'
+    trailerUrl: 'https://www.youtube.com/watch?v=yF8zF0B7b88',
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/yF8zF0B7b88',
+    synopsis: 'Lệ là một người phụ nữ lam lũ làm nghề vớt xác trên khúc sông vắng vùng sông nước Tây Nam Bộ. Công việc của bà luôn đối diện với ranh giới mong manh giữa âm và dương. Mọi chuyện bắt đầu trở nên kinh hoàng khi bà vô tình cứu vớt một linh hồn oan khuất bị trói buộc dưới đáy sông sâu, kéo theo hàng loạt hiện tượng tâm linh rợn tóc gáy đe dọa sinh mạng của chính con gái bà.',
+    casts: [
+      {
+        id: 'c-31',
+        actorName: 'Nguyễn Hữu Hoàng',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-32',
+        actorName: 'Việt Hương',
+        characterName: 'Bà Lệ',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-33',
+        actorName: 'Trung Dân',
+        characterName: 'Ông Sáu Lèo',
+        roleType: 'SUPPORTING',
+        avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      },
+      {
+        id: 'c-34',
+        actorName: 'Dạ Chúc',
+        characterName: 'Bé Nhung',
+        roleType: 'SUPPORTING',
+        avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop',
+        displayOrder: 3
+      }
+    ]
   },
   {
     id: 'mov-05',
@@ -168,17 +319,53 @@ export const MOVIES = [
     director: 'Christopher McQuarrie',
     cast: 'Tom Cruise, Hayley Atwell, Ving Rhames',
     genre: ['Hành động', 'Phiêu lưu', 'Giật gân'],
-    language: 'Tiếng Anh - Phụ đề Tiếng Việt',
+    language: 'Tiếng Anh',
+    subtitle: 'Phụ đề Tiếng Việt',
     country: 'Mỹ',
     ageRating: 'T16',
     duration: 169,
-    rating: 8.9,
-    votes: '18.5k',
     showingStatus: 'NOW_SHOWING',
     releaseDate: '23.05.2025',
+    endDate: '15.10.2025',
     posterUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600&auto=format&fit=crop',
     backdropUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=1400&auto=format&fit=crop',
-    synopsis: 'Ethan Hunt và nhóm IMF bước vào nhiệm vụ sinh tử cuối cùng chống lại Thực thể AI toàn năng đe dọa sự kiểm soát quân sự của toàn cầu.'
+    trailerUrl: 'https://www.youtube.com/watch?v=NOhDyRTTnw8',
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/NOhDyRTTnw8',
+    synopsis: 'Cuộc đối đầu sinh tử đỉnh cao giữa Ethan Hunt và Thực Thể AI toàn năng đã đạt đến đỉnh điểm. Với mạng sống của các đồng đội thân thiết và trật tự an ninh toàn cầu bị đe dọa trực diện, Hunt buộc phải đưa ra những quyết định nghiệt ngã, thực hiện những pha hành động cảm tử không tưởng dưới đáy đại dương và trên bầu trời Bắc Cực.',
+    casts: [
+      {
+        id: 'c-41',
+        actorName: 'Christopher McQuarrie',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-42',
+        actorName: 'Tom Cruise',
+        characterName: 'Ethan Hunt',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-43',
+        actorName: 'Hayley Atwell',
+        characterName: 'Grace',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      },
+      {
+        id: 'c-44',
+        actorName: 'Ving Rhames',
+        characterName: 'Luther Stickell',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop',
+        displayOrder: 3
+      }
+    ]
   },
   {
     id: 'mov-06',
@@ -187,17 +374,53 @@ export const MOVIES = [
     director: 'James Gunn',
     cast: 'David Corenswet, Rachel Brosnahan, Nicholas Hoult',
     genre: ['Hành động', 'Khoa học viễn tưởng'],
-    language: 'Tiếng Anh - Phụ đề Tiếng Việt',
+    language: 'Tiếng Anh',
+    subtitle: 'Phụ đề Tiếng Việt',
     country: 'Mỹ',
     ageRating: 'T13',
     duration: 130,
-    rating: 9.0,
-    votes: '12.8k',
     showingStatus: 'COMING_SOON',
     releaseDate: '25.07.2025',
+    endDate: '30.11.2025',
     posterUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&auto=format&fit=crop',
     backdropUrl: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1400&auto=format&fit=crop',
-    synopsis: 'Khởi đầu mới của vũ trụ DC với chàng phóng viên Clark Kent cân bằng giữa nguồn gốc Krypton và nhân tính Trái Đất.'
+    trailerUrl: 'https://www.youtube.com/watch?v=Ox8ZpP6bFfg',
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/Ox8ZpP6bFfg',
+    synopsis: 'Mở màn cho kỷ nguyên mới của Vũ trụ Điện ảnh DC dưới bàn tay chỉ đạo của James Gunn. Bộ phim tập trung vào chàng phóng viên trẻ Clark Kent khi anh phải tìm cách cân bằng giữa di sản siêu phàm của người Krypton với những giá trị đạo đức nhân văn sâu sắc mà anh được nuôi dưỡng tại thị trấn Smallville, Trái Đất.',
+    casts: [
+      {
+        id: 'c-51',
+        actorName: 'James Gunn',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-52',
+        actorName: 'David Corenswet',
+        characterName: 'Clark Kent / Superman',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-53',
+        actorName: 'Rachel Brosnahan',
+        characterName: 'Lois Lane',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      },
+      {
+        id: 'c-54',
+        actorName: 'Nicholas Hoult',
+        characterName: 'Lex Luthor',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop',
+        displayOrder: 3
+      }
+    ]
   },
   {
     id: 'mov-07',
@@ -206,17 +429,53 @@ export const MOVIES = [
     director: 'Joseph Kosinski',
     cast: 'Brad Pitt, Damson Idris, Javier Bardem',
     genre: ['Hành động', 'Thể thao'],
-    language: 'Tiếng Anh - Phụ đề Tiếng Việt',
+    language: 'Tiếng Anh',
+    subtitle: 'Phụ đề Tiếng Việt',
     country: 'Mỹ',
     ageRating: 'T13',
     duration: 140,
-    rating: 8.7,
-    votes: '9.3k',
     showingStatus: 'COMING_SOON',
     releaseDate: '01.08.2025',
+    endDate: '15.11.2025',
     posterUrl: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&auto=format&fit=crop',
     backdropUrl: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=1400&auto=format&fit=crop',
-    synopsis: 'Huyền thoại đua xe F1 quay trở lại đường đua nghẹt thở để dìu dắt tay đua trẻ tài năng tranh chức vô địch thế giới.'
+    trailerUrl: 'https://www.youtube.com/watch?v=8v_4p9gH4eA',
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/8v_4p9gH4eA',
+    synopsis: 'Được quay trực tiếp tại các chặng đua Grand Prix F1 thực tế trên khắp thế giới với công nghệ máy quay IMAX tối tân. Sonny Hayes (Brad Pitt thủ vai), cựu tay đua lẫy lừng từng gặp tai nạn khủng khiếp trong quá khứ, quyết định tái xuất đường đua tốc độ đỉnh cao để làm người cố vấn kiêm tay lái kèm cặp cho thần đồng trẻ tuổi Joshua Pearce.',
+    casts: [
+      {
+        id: 'c-61',
+        actorName: 'Joseph Kosinski',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-62',
+        actorName: 'Brad Pitt',
+        characterName: 'Sonny Hayes',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-63',
+        actorName: 'Damson Idris',
+        characterName: 'Joshua Pearce',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      },
+      {
+        id: 'c-64',
+        actorName: 'Javier Bardem',
+        characterName: 'Chủ đội đua APXGP',
+        roleType: 'SUPPORTING',
+        avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop',
+        displayOrder: 3
+      }
+    ]
   },
   {
     id: 'mov-08',
@@ -225,17 +484,45 @@ export const MOVIES = [
     director: 'Shunsuke Ishikawa',
     cast: 'Nobunaga Shimazaki, Yuma Uchida',
     genre: ['Hoạt hình', 'Thể thao'],
-    language: 'Tiếng Nhật - Phụ đề Tiếng Việt',
+    language: 'Tiếng Nhật',
+    subtitle: 'Phụ đề Tiếng Việt',
     country: 'Nhật Bản',
     ageRating: 'T13',
     duration: 90,
-    rating: 8.6,
-    votes: '7.8k',
     showingStatus: 'COMING_SOON',
     releaseDate: '15.08.2025',
+    endDate: '30.10.2025',
     posterUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop',
     backdropUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1400&auto=format&fit=crop',
-    synopsis: 'Góc nhìn đặc biệt về thiên tài bóng đá lười biếng Seishiro Nagi và hành trình đánh thức khát khao trở thành tiền đạo số 1 thế giới.'
+    trailerUrl: 'https://www.youtube.com/watch?v=qS5s4hF2v54',
+    trailerYoutubeUrl: 'https://www.youtube.com/embed/qS5s4hF2v54',
+    synopsis: 'Khám phá câu chuyện từ góc nhìn của thiên tài lười biếng Nagi Seishiro trước khi bước chân vào dự án đào tạo tiền đạo Blue Lock khắc nghiệt. Được phát hiện bởi người bạn cùng trường giàu tham vọng Mikage Reo, Nagi dần đánh thức bản năng sát thủ và ngọn lửa đam mê bóng đá cuồng nhiệt ẩn sâu bên trong mình.',
+    casts: [
+      {
+        id: 'c-71',
+        actorName: 'Shunsuke Ishikawa',
+        characterName: 'Đạo diễn',
+        roleType: 'DIRECTOR',
+        avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&auto=format&fit=crop',
+        displayOrder: 0
+      },
+      {
+        id: 'c-72',
+        actorName: 'Nobunaga Shimazaki',
+        characterName: 'Nagi Seishiro (Lồng tiếng)',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200&auto=format&fit=crop',
+        displayOrder: 1
+      },
+      {
+        id: 'c-73',
+        actorName: 'Yuma Uchida',
+        characterName: 'Mikage Reo (Lồng tiếng)',
+        roleType: 'LEAD',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop',
+        displayOrder: 2
+      }
+    ]
   }
 ];
 
