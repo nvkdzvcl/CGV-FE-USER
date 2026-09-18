@@ -227,3 +227,36 @@
   font-weight: 800;
   color: var(--primary-hover);
 }
+/* Responsive adjustments for Seat Picker Modal */
+@media (max-width: 768px) {
+  .modal-backdrop {
+    padding: 10px;
+  }
+  .seat-modal-content {
+    max-height: 94vh;
+    border-radius: 12px;
+  }
+  .seat-modal-header {
+    padding: 14px 18px;
+  }
+  .seats-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 6px;
+  }
+  .seat-legend {
+    margin: 0 14px 18px;
+    padding: 10px 12px;
+    gap: 12px;
+    font-size: 0.75rem;
+  }
+  .booking-checkout-panel {
+    padding: 16px 18px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .booking-checkout-panel .btn-primary {
+    width: 100%;
+  }
+}

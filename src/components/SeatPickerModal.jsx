@@ -127,8 +127,13 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
         {/* Header */}
         <div className="seat-modal-header">
           <div>
-            <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: 4 }}>
-              {bookingContext.movie?.title}
+            <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              {bookingContext.movie?.ageRating && (
+                <span className={`age-chip age-${bookingContext.movie.ageRating.toLowerCase()}`}>
+                  {bookingContext.movie.ageRating}
+                </span>
+              )}
+              <span>{bookingContext.movie?.title}</span>
             </h3>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
               {bookingContext.cinema?.name} • Suất {bookingContext.timeSlot} • {bookingContext.date}
@@ -145,6 +150,27 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
             </button>
           </div>
         </div>
+
+        {/* Cảnh báo độ tuổi (T16 / T18) theo quy chuẩn Cục Điện ảnh */}
+        {!successOrder && (bookingContext.movie?.ageRating === 'T18' || bookingContext.movie?.ageRating === 'T16') && (
+          <div style={{
+            background: bookingContext.movie?.ageRating === 'T18' ? 'rgba(220, 38, 38, 0.15)' : 'rgba(234, 88, 12, 0.15)',
+            border: `1px solid ${bookingContext.movie?.ageRating === 'T18' ? 'rgba(220, 38, 38, 0.4)' : 'rgba(234, 88, 12, 0.4)'}`,
+            color: bookingContext.movie?.ageRating === 'T18' ? '#fca5a5' : '#fdba74',
+            padding: '8px 16px',
+            borderRadius: 8,
+            margin: '0 24px 14px',
+            fontSize: '0.82rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <span style={{ fontWeight: 800 }}>⚠️ Quy định độ tuổi ({bookingContext.movie.ageRating}):</span>
+            <span>
+              Phim dành cho khán giả từ đủ {bookingContext.movie.ageRating === 'T18' ? '18' : '16'} tuổi trở lên. Quý khách vui lòng mang theo giấy tờ tùy thân (CCCD) để đối soát khi vào phòng chiếu.
+            </span>
+          </div>
+        )}
 
         {successOrder ? (
           <div style={{ padding: '60px 30px', textAlign: 'center' }}>

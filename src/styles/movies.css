@@ -1,35 +1,208 @@
+/* movies.css - CGV Movie Catalog Layout & Filter Controls (Responsive) */
+
 .movies-header {
   margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
+
+.movies-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 14px;
+}
+
+.movies-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.movies-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.movies-count-badge {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ── Full Grid with Wide & Spacious Cards ── */
 .movies-grid-full {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 26px;
 }
+
+/* ── Modern Active Filter Chips Bar ── */
 .active-filters-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+  padding: 10px 14px;
+  background: rgba(18, 24, 38, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
-.active-filter-pill {
-  background: rgba(255, 43, 84, 0.15);
-  border: 1px solid rgba(255, 43, 84, 0.3);
-  color: #fff;
+
+.active-filter-label {
   font-size: 0.78rem;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  display: flex;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 2px;
+}
+
+.active-filter-chip {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-.btn-clear-filters {
-  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  color: #e2e8f0;
   font-size: 0.8rem;
-  text-decoration: underline;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  transition: all var(--transition-fast);
+}
+
+.active-filter-chip:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--bg-surface-hover);
+}
+
+.active-filter-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.active-filter-chip-remove:hover {
+  background: rgba(255, 43, 84, 0.25);
+  color: #ff476d;
+}
+
+.btn-clear-all-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-clear-all-filters:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+/* Mobile Filter Toggle Button */
+.btn-mobile-filter-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
 }
-.btn-clear-filters:hover {
-  color: #fff;
+
+.mobile-filter-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.btn-mobile-filter-close {
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* ── Responsive Breakpoints ── */
+@media (max-width: 1100px) {
+  .movies-grid-full {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  .btn-mobile-filter-toggle {
+    display: inline-flex;
+  }
+
+  .mobile-filter-header {
+    display: flex;
+  }
+
+  .filter-sidebar {
+    display: none;
+    margin-bottom: 24px;
+  }
+
+  .filter-sidebar.mobile-open {
+    display: block;
+    animation: fadeInSidebar 0.25s ease;
+  }
+}
+
+@keyframes fadeInSidebar {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 600px) {
+  .movies-title {
+    font-size: 1.35rem;
+  }
+
+  .movies-grid-full {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .movies-grid-full {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
 }

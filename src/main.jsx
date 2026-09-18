@@ -11,6 +11,8 @@ import './styles/promotions.css';
 import './styles/seat-booking.css';
 import './styles/auth-modal.css';
 import './styles/toast.css';
+import './styles/profile.css';
+import './styles/movie-detail.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

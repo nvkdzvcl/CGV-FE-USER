@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Play, Ticket, Star, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
+import { Flame, Play, Ticket, ChevronRight, ChevronLeft, Sparkles, Clock, Info, Trophy } from 'lucide-react';
+import TrailerModal from '../components/TrailerModal';
 import QuickBooking from '../components/QuickBooking';
 import MovieCard from '../components/MovieCard';
 import { MOVIES, CINEMAS } from '../data/mockData';
 
 export default function HomePage({ onOpenBooking }) {
   const [heroIdx, setHeroIdx] = useState(0);
+  const [heroTrailerOpen, setHeroTrailerOpen] = useState(false);
   const heroMovies = MOVIES.filter(m => m.backdropUrl);
   const currentHero = heroMovies[heroIdx] || MOVIES[0];
 
   const nowShowing = MOVIES.filter(m => m.showingStatus === 'NOW_SHOWING');
   const comingSoon = MOVIES.filter(m => m.showingStatus === 'COMING_SOON');
-  const topMovies = [...nowShowing].sort((a, b) => b.rating - a.rating).slice(0, 5);
+  const topMovies = nowShowing.slice(0, 5);
 
   const autoPlayRef = useRef(null);
 
@@ -65,10 +67,16 @@ export default function HomePage({ onOpenBooking }) {
         <div className="hero-overlay" />
         
         <div key={currentHero.id + '-content'} className="hero-content hero-content-transition">
-          <div className="hero-badge">
-            <span className="badge-tag">
-              <Flame size={12} /> Phim đang chiếu
+          <div className="hero-badge" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="movie-status-pill status-now-showing" style={{ fontSize: '0.8rem', padding: '5px 12px' }}>
+              <span className="status-live-dot" />
+              Phim đang chiếu
             </span>
+            {currentHero.ageRating && (
+              <span className={`movie-age-badge age-${currentHero.ageRating.toLowerCase()}`} style={{ height: 26, minWidth: 36 }}>
+                {currentHero.ageRating}
+              </span>
+            )}
           </div>
 
           <h1 className="hero-title">{currentHero.title}</h1>
@@ -88,16 +96,19 @@ export default function HomePage({ onOpenBooking }) {
               <Ticket size={16} />
               Đặt vé ngay
             </button>
-            {currentHero.trailerUrl && (
-              <a
-                href={currentHero.trailerUrl}
-                target="_blank"
-                rel="noreferrer"
+            <Link to={`/movies/${currentHero.id}`} className="btn-secondary" style={{ textDecoration: "none" }}>
+              <Info size={16} />
+              Chi tiết phim
+            </Link>
+            {currentHero.trailerYoutubeUrl && (
+              <button
+                type="button"
                 className="btn-secondary"
+                onClick={() => setHeroTrailerOpen(true)}
               >
-                <Play size={16} />
+                <Play size={16} fill="#fff" />
                 Xem trailer
-              </a>
+              </button>
             )}
           </div>
         </div>
@@ -186,28 +197,47 @@ export default function HomePage({ onOpenBooking }) {
         <div>
           <div className="top-movies-panel">
             <div className="section-title" style={{ fontSize: '1.15rem', marginBottom: 16 }}>
-              <Star className="section-title-icon" size={20} fill="var(--primary)" />
+              <Trophy className="section-title-icon" size={20} />
               <span>Top phim được yêu thích</span>
             </div>
 
             {topMovies.map((m, idx) => (
-              <div
-                key={m.id}
-                className="top-movie-item"
-                onClick={() => onOpenBooking({
-                  movie: m,
-                  cinema: CINEMAS[0],
-                  date: 'Hôm nay',
-                  timeSlot: '19:30'
-                })}
-              >
+              <div key={m.id} className="top-movie-item">
                 <div className={`top-movie-rank rank-${idx + 1}`}>{idx + 1}</div>
-                <img src={m.posterUrl} alt={m.title} className="top-movie-thumb" />
-                <div className="top-movie-details">
-                  <div className="top-movie-name">{m.title}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fbbf24', fontSize: '0.8rem', fontWeight: 700 }}>
-                    <Star size={12} fill="#fbbf24" stroke="none" />
-                    {m.rating}
+                <Link to={`/movies/${m.id}`}>
+                  <img src={m.posterUrl} alt={m.title} className="top-movie-thumb" />
+                </Link>
+                <div className="top-movie-details" style={{ flex: 1 }}>
+                  <Link to={`/movies/${m.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                    <div className="top-movie-name">
+                      {m.ageRating && (
+                        <span className={`age-chip age-${m.ageRating.toLowerCase()}`} style={{ marginRight: 4 }}>
+                          {m.ageRating}
+                        </span>
+                      )}
+                      {m.title}
+                    </div>
+                  </Link>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-muted)", fontSize: "0.78rem" }}>
+                      <Clock size={11} />
+                      <span>{m.duration} phút</span>
+                      <span>•</span>
+                      <span>{m.genre?.[0] || "Phim"}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-book-ticket"
+                      style={{ width: "auto", padding: "3px 10px", fontSize: "0.75rem", borderRadius: "4px" }}
+                      onClick={() => onOpenBooking({
+                        movie: m,
+                        cinema: CINEMAS[0],
+                        date: "Hôm nay",
+                        timeSlot: "19:30"
+                      })}
+                    >
+                      Đặt vé
+                    </button>
                   </div>
                 </div>
               </div>
@@ -223,6 +253,13 @@ export default function HomePage({ onOpenBooking }) {
           </div>
         </div>
       </div>
+      {/* Trailer Modal for Hero Banner */}
+      <TrailerModal
+        isOpen={heroTrailerOpen}
+        onClose={() => setHeroTrailerOpen(false)}
+        trailerUrl={currentHero.trailerYoutubeUrl}
+        title={currentHero.title}
+      />
     </div>
   );
 }

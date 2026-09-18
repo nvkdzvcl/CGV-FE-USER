@@ -13,6 +13,8 @@ import MoviesPage from './pages/MoviesPage';
 import CinemasPage from './pages/CinemasPage';
 import PromotionsPage from './pages/PromotionsPage';
 import OAuthCallbackPage from './pages/OAuthCallbackPage';
+import ProfilePage from './pages/ProfilePage';
+import MovieDetailPage from './pages/MovieDetailPage';
 
 // ─────────────────────────────────────────────
 // Inner App (cần phải nằm bên trong AuthProvider)
@@ -60,10 +62,13 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<HomePage onOpenBooking={handleOpenBooking} />} />
           <Route path="/movies" element={<MoviesPage onOpenBooking={handleOpenBooking} />} />
+          <Route path="/movies/:id" element={<MovieDetailPage onOpenBooking={handleOpenBooking} />} />
           <Route path="/cinemas" element={<CinemasPage onOpenBooking={handleOpenBooking} />} />
           <Route path="/promotions" element={<PromotionsPage />} />
           {/* OAuth callback route - xử lý redirect từ Keycloak */}
           <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+          {/* User profile route */}
+          <Route path="/profile" element={<ProfilePage />} />
         </Routes>
       </main>
 

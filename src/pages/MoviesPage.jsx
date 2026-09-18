@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Film, Filter, X, Flame } from 'lucide-react';
+import { Film, Flame, RotateCcw, X, SlidersHorizontal } from 'lucide-react';
 import MovieCard from '../components/MovieCard';
 import { MOVIES, CINEMAS } from '../data/mockData';
 
@@ -9,15 +9,24 @@ const ALL_GENRES = [
   'Tình cảm', 'Hoạt hình', 'Khoa học viễn tưởng', 'Gia đình'
 ];
 const ALL_COUNTRIES = ['Việt Nam', 'Mỹ', 'Hàn Quốc', 'Nhật Bản'];
+const ALL_AGE_RATINGS = [
+  { code: 'ALL', label: 'Tất cả độ tuổi' },
+  { code: 'P', label: 'P — Phổ biến mọi lứa tuổi', chipClass: 'age-p' },
+  { code: 'T13', label: 'T13 — Khán giả từ 13+ tuổi', chipClass: 'age-t13' },
+  { code: 'T16', label: 'T16 — Khán giả từ 16+ tuổi', chipClass: 'age-t16' },
+  { code: 'T18', label: 'T18 — Khán giả từ 18+ tuổi', chipClass: 'age-t18' },
+];
 
 export default function MoviesPage({ onOpenBooking }) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchQ = searchParams.get('q') || '';
   const initialStatus = searchParams.get('status') === 'soon' ? 'COMING_SOON' : 'ALL';
 
   const [activeTab, setActiveTab] = useState(initialStatus);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [selectedCountry, setSelectedCountry] = useState('ALL');
+  const [selectedAge, setSelectedAge] = useState('ALL');
   const [sortBy, setSortBy] = useState('newest');
 
   const toggleGenre = (genre) => {
@@ -27,6 +36,18 @@ export default function MoviesPage({ onOpenBooking }) {
       setSelectedGenres([...selectedGenres, genre]);
     }
   };
+
+  const clearAllFilters = () => {
+    setSelectedGenres([]);
+    setSelectedCountry('ALL');
+    setSelectedAge('ALL');
+    if (searchQ) {
+      setSearchParams({});
+    }
+  };
+
+  const hasActiveFilters = selectedGenres.length > 0 || selectedCountry !== 'ALL' || selectedAge !== 'ALL' || Boolean(searchQ);
+  const selectedAgeConfig = ALL_AGE_RATINGS.find(a => a.code === selectedAge);
 
   const filteredMovies = useMemo(() => {
     return MOVIES.filter(m => {
@@ -44,18 +65,25 @@ export default function MoviesPage({ onOpenBooking }) {
       }
       // Country
       if (selectedCountry !== 'ALL' && m.country !== selectedCountry) return false;
+      // Age Rating
+      if (selectedAge !== 'ALL' && m.ageRating !== selectedAge) return false;
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'rating') return b.rating - a.rating;
-      return 0; // default order
+      if (sortBy === 'duration-desc') return b.duration - a.duration;
+      if (sortBy === 'duration-asc') return a.duration - b.duration;
+      return 0; // default newest
     });
-  }, [searchQ, activeTab, selectedGenres, selectedCountry, sortBy]);
+  }, [searchQ, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
 
   return (
     <div className="movies-page">
       <div className="page-with-sidebar">
         {/* Left Filter Sidebar */}
-        <aside className="filter-sidebar">
+        <aside className={`filter-sidebar ${mobileFilterOpen ? "mobile-open" : ""}`}>
+          <div className="mobile-filter-header">
+            <span style={{ fontWeight: 700, color: "#fff" }}>Bộ lọc tìm kiếm</span>
+            <button type="button" className="btn-mobile-filter-close" onClick={() => setMobileFilterOpen(false)}><X size={18} /></button>
+          </div>
           <div className="filter-group">
             <div className="filter-title">Trạng thái</div>
             <div className="filter-nav-list">
@@ -78,6 +106,26 @@ export default function MoviesPage({ onOpenBooking }) {
                 <Film size={16} /> Phim sắp chiếu
               </div>
             </div>
+          </div>
+
+          <div className="filter-group">
+            <div className="filter-title">Độ tuổi (Phân loại)</div>
+            {ALL_AGE_RATINGS.map(item => (
+              <label key={item.code} className="filter-radio-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="radio"
+                  name="ageRating"
+                  checked={selectedAge === item.code}
+                  onChange={() => setSelectedAge(item.code)}
+                />
+                {item.chipClass && (
+                  <span className={`age-chip ${item.chipClass}`} style={{ fontSize: '0.65rem', padding: '0 5px' }}>
+                    {item.code}
+                  </span>
+                )}
+                <span>{item.label}</span>
+              </label>
+            ))}
           </div>
 
           <div className="filter-group">
@@ -133,10 +181,19 @@ export default function MoviesPage({ onOpenBooking }) {
               <input
                 type="radio"
                 name="sort"
-                checked={sortBy === 'rating'}
-                onChange={() => setSortBy('rating')}
+                checked={sortBy === 'duration-desc'}
+                onChange={() => setSortBy('duration-desc')}
               />
-              Đánh giá cao nhất
+              Thời lượng (Dài nhất)
+            </label>
+            <label className="filter-radio-label">
+              <input
+                type="radio"
+                name="sort"
+                checked={sortBy === 'duration-asc'}
+                onChange={() => setSortBy('duration-asc')}
+              />
+              Thời lượng (Ngắn nhất)
             </label>
           </div>
         </aside>
@@ -144,29 +201,87 @@ export default function MoviesPage({ onOpenBooking }) {
         {/* Right Content */}
         <main>
           <div className="movies-header">
-            <h2 style={{ fontSize: '1.8rem', color: '#fff', marginBottom: 12 }}>
-              {searchQ ? `Kết quả tìm kiếm cho "${searchQ}"` : 'Danh mục phim điện ảnh'}
-            </h2>
+            <div className="movies-header-top">
+              <div className="movies-title-group">
+                <h2 className="movies-title">
+                  {searchQ ? `Kết quả tìm kiếm cho "${searchQ}"` : 'Danh mục phim điện ảnh'}
+                </h2>
+                <span className="movies-count-badge">({filteredMovies.length} phim)</span>
+              </div>
 
-            {/* Active Filters */}
-            {(selectedGenres.length > 0 || selectedCountry !== 'ALL' || searchQ) && (
+              <button
+                type="button"
+                className="btn-mobile-filter-toggle"
+                onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+              >
+                <SlidersHorizontal size={16} />
+                <span>Bộ lọc {hasActiveFilters ? "(Đang chọn)" : ""}</span>
+              </button>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="btn-clear-all-filters"
+                  onClick={clearAllFilters}
+                  title="Đặt lại toàn bộ bộ lọc"
+                >
+                  <RotateCcw size={13} />
+                  <span>Xóa bộ lọc</span>
+                </button>
+              )}
+            </div>
+
+            {/* Active Filter Chips Bar */}
+            {hasActiveFilters && (
               <div className="active-filters-bar">
-                {selectedGenres.map(g => (
-                  <span key={g} className="active-filter-pill">
-                    {g} <X size={12} style={{ cursor: 'pointer' }} onClick={() => toggleGenre(g)} />
-                  </span>
-                ))}
-                {selectedCountry !== 'ALL' && (
-                  <span className="active-filter-pill">
-                    {selectedCountry} <X size={12} style={{ cursor: 'pointer' }} onClick={() => setSelectedCountry('ALL')} />
+                <span className="active-filter-label">Đang lọc:</span>
+
+                {selectedAge !== 'ALL' && (
+                  <span className="active-filter-chip">
+                    <span>Độ tuổi:</span>
+                    {selectedAgeConfig?.chipClass && (
+                      <span className={`age-chip ${selectedAgeConfig.chipClass}`} style={{ margin: '0 2px' }}>
+                        {selectedAge}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="active-filter-chip-remove"
+                      onClick={() => setSelectedAge('ALL')}
+                      title="Bỏ lọc độ tuổi"
+                    >
+                      <X size={12} />
+                    </button>
                   </span>
                 )}
-                <span
-                  className="btn-clear-filters"
-                  onClick={() => { setSelectedGenres([]); setSelectedCountry('ALL'); }}
-                >
-                  Xóa tất cả bộ lọc
-                </span>
+
+                {selectedCountry !== 'ALL' && (
+                  <span className="active-filter-chip">
+                    <span>Quốc gia: {selectedCountry}</span>
+                    <button
+                      type="button"
+                      className="active-filter-chip-remove"
+                      onClick={() => setSelectedCountry('ALL')}
+                      title="Bỏ lọc quốc gia"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                )}
+
+                {selectedGenres.map(g => (
+                  <span key={g} className="active-filter-chip">
+                    <span>{g}</span>
+                    <button
+                      type="button"
+                      className="active-filter-chip-remove"
+                      onClick={() => toggleGenre(g)}
+                      title={`Bỏ lọc thể loại ${g}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
               </div>
             )}
           </div>

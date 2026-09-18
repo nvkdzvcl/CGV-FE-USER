@@ -15,7 +15,7 @@ import OtpInput from './OtpInput';
 import toast from '../services/toastService';
 
 // ─────────── Hằng số ───────────
-const TAB = { LOGIN: 'login', REGISTER: 'register' };
+const TAB = { LOGIN: 'login', REGISTER: 'register', FORGOT: 'forgot' };
 const REGISTER_STEP = { FORM: 'form', OTP: 'otp' };
 
 // ─────────── Google & Facebook SVG Icon ───────────
@@ -211,7 +211,7 @@ function OtpStep({ email, password, fullName, onBack, onSuccess }) {
 }
 
 // ─────────── Login Form ───────────
-function LoginForm({ onClose }) {
+function LoginForm({ onClose, onForgotPassword }) {
   const { loginWithTokens } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -255,7 +255,17 @@ function LoginForm({ onClose }) {
       </div>
 
       <div className="auth-form-group">
-        <label className="auth-label">Mật khẩu</label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label className="auth-label">Mật khẩu</label>
+          <button
+            type="button"
+            className="auth-forgot-link"
+            onClick={() => onForgotPassword(username)}
+            tabIndex={-1}
+          >
+            Quên mật khẩu?
+          </button>
+        </div>
         <div className="auth-input-wrap">
           <Lock size={16} className="auth-input-icon" />
           <input
@@ -410,12 +420,265 @@ function RegisterForm({ onOtpStep }) {
   );
 }
 
+// ─────────── Forgot Password Form ───────────
+function ForgotPasswordForm({ initialEmail = '', onBackToLogin }) {
+  const [step, setStep] = useState('EMAIL'); // 'EMAIL' | 'OTP' | 'RESET'
+  const [email, setEmail] = useState(initialEmail);
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(30);
+
+  React.useEffect(() => {
+    if (step === 'OTP' && resendCooldown > 0) {
+      const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [step, resendCooldown]);
+
+  const handleSendOtp = (e) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast.warning('Vui lòng nhập địa chỉ email.');
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setResendCooldown(30);
+      setStep('OTP');
+      toast.success(`Mã OTP đặt lại mật khẩu đã được gửi tới ${email.trim()}!`);
+    }, 500);
+  };
+
+  const handleVerifyOtp = (e) => {
+    e.preventDefault();
+    if (!otp || otp.length < 6) {
+      toast.warning('Vui lòng nhập đầy đủ 6 chữ số OTP.');
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      setStep('RESET');
+      toast.success('Mã OTP hợp lệ! Vui lòng nhập mật khẩu mới.');
+    }, 400);
+  };
+
+  const handleResetPassword = (e) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      toast.warning('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Mật khẩu xác nhận không trùng khớp!');
+      return;
+    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      toast.success('Đặt lại mật khẩu thành công! Vui lòng đăng nhập bằng mật khẩu mới. 🎉');
+      onBackToLogin(email);
+    }, 500);
+  };
+
+  return (
+    <div className="forgot-password-wrap">
+      {step === 'EMAIL' && (
+        <form onSubmit={handleSendOtp} noValidate>
+          <p className="auth-step-desc">
+            Nhập địa chỉ email tài khoản để nhận mã xác thực OTP đặt lại mật khẩu.
+          </p>
+          <div className="auth-form-group">
+            <label className="auth-label">Email tài khoản</label>
+            <div className="auth-input-wrap">
+              <Mail size={16} className="auth-input-icon" />
+              <input
+                type="email"
+                className="auth-input auth-input-icon-left"
+                placeholder="example@gmail.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: '100%', marginTop: 8 }}
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="btn-loading">
+                <span className="spinner-sm" /> Đang gửi OTP...
+              </span>
+            ) : (
+              'Gửi mã xác thực OTP →'
+            )}
+          </button>
+
+          <div style={{ textAlign: 'center', marginTop: 18 }}>
+            <button
+              type="button"
+              className="auth-link-btn"
+              onClick={() => onBackToLogin(email)}
+            >
+              <ChevronLeft size={16} style={{ display: 'inline', verticalAlign: 'middle' }} />
+              Quay lại Đăng nhập
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === 'OTP' && (
+        <form onSubmit={handleVerifyOtp} noValidate>
+          <p className="auth-step-desc">
+            Mã OTP gồm 6 chữ số đã được gửi tới <strong>{email}</strong>. Vui lòng nhập bên dưới:
+          </p>
+
+          <div className="otp-input-container" style={{ margin: '20px 0' }}>
+            <OtpInput value={otp} onChange={setOtp} length={6} disabled={loading} />
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 12, marginBottom: 16 }}>
+            {resendCooldown > 0 ? (
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                Gửi lại mã sau <strong>{resendCooldown}s</strong>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="otp-resend-btn"
+                onClick={() => {
+                  setResendCooldown(30);
+                  toast.success('Đã gửi lại mã OTP mới!');
+                }}
+              >
+                Không nhận được mã? Gửi lại
+              </button>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: '100%' }}
+            disabled={loading || otp.length < 6}
+          >
+            {loading ? (
+              <span className="btn-loading">
+                <span className="spinner-sm" /> Đang xác thực...
+              </span>
+            ) : (
+              'Xác nhận OTP →'
+            )}
+          </button>
+
+          <div style={{ textAlign: 'center', marginTop: 18 }}>
+            <button
+              type="button"
+              className="auth-link-btn"
+              onClick={() => setStep('EMAIL')}
+            >
+              <ChevronLeft size={16} style={{ display: 'inline', verticalAlign: 'middle' }} />
+              Đổi địa chỉ email khác
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === 'RESET' && (
+        <form onSubmit={handleResetPassword} noValidate>
+          <p className="auth-step-desc">
+            Nhập mật khẩu mới cho tài khoản <strong>{email}</strong>.
+          </p>
+
+          <div className="auth-form-group">
+            <label className="auth-label">Mật khẩu mới (tối thiểu 6 ký tự)</label>
+            <div className="auth-input-wrap">
+              <Lock size={16} className="auth-input-icon" />
+              <input
+                type={showNew ? 'text' : 'password'}
+                className="auth-input auth-input-icon-left auth-input-icon-right"
+                placeholder="••••••••"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={loading}
+                required
+                minLength={6}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="auth-input-toggle"
+                onClick={() => setShowNew((v) => !v)}
+                tabIndex={-1}
+              >
+                {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="auth-form-group">
+            <label className="auth-label">Xác nhận mật khẩu mới</label>
+            <div className="auth-input-wrap">
+              <Lock size={16} className="auth-input-icon" />
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                className="auth-input auth-input-icon-left auth-input-icon-right"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={loading}
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                className="auth-input-toggle"
+                onClick={() => setShowConfirm((v) => !v)}
+                tabIndex={-1}
+              >
+                {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: '100%', marginTop: 8 }}
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="btn-loading">
+                <span className="spinner-sm" /> Đang cập nhật...
+              </span>
+            ) : (
+              'Cập nhật mật khẩu mới 🚀'
+            )}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 // ─────────── Main AuthModal ───────────
 export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
   const { loginWithTokens } = useAuth();
   const [tab, setTab] = useState(initialTab);
   const [registerStep, setRegisterStep] = useState(REGISTER_STEP.FORM);
   const [pendingRegistration, setPendingRegistration] = useState(null);
+  const [forgotEmail, setForgotEmail] = useState('');
 
   function handleSwitchTab(newTab) {
     setTab(newTab);
@@ -431,6 +694,15 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
   function handleOtpBack() {
     setRegisterStep(REGISTER_STEP.FORM);
     setPendingRegistration(null);
+  }
+
+  function handleForgotPassword(email) {
+    setForgotEmail(email || '');
+    setTab(TAB.FORGOT);
+  }
+
+  function handleBackToLogin(email) {
+    setTab(TAB.LOGIN);
   }
 
   /**
@@ -458,7 +730,7 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
     window.location.href = url;
   }
 
-  const showTabs = registerStep === REGISTER_STEP.FORM;
+  const showTabs = registerStep === REGISTER_STEP.FORM && tab !== TAB.FORGOT;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -474,10 +746,12 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
 
         {/* Header */}
         <div className="auth-modal-header">
-          <h3 className="auth-modal-title">Chào mừng đến CineGo</h3>
+          <h3 className="auth-modal-title">
+            {tab === TAB.FORGOT ? 'Khôi phục mật khẩu' : 'Chào mừng đến CineGo'}
+          </h3>
         </div>
 
-        {/* Tabs - chỉ hiện khi không đang ở bước OTP */}
+        {/* Tabs - chỉ hiện khi không đang ở bước OTP và không ở tab Forgot */}
         {showTabs && (
           <div className="auth-tabs">
             <div
@@ -500,7 +774,12 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
         )}
 
         {/* Content */}
-        {registerStep === REGISTER_STEP.OTP && pendingRegistration ? (
+        {tab === TAB.FORGOT ? (
+          <ForgotPasswordForm
+            initialEmail={forgotEmail}
+            onBackToLogin={handleBackToLogin}
+          />
+        ) : registerStep === REGISTER_STEP.OTP && pendingRegistration ? (
           <OtpStep
             email={pendingRegistration.email}
             password={pendingRegistration.password}
@@ -510,7 +789,9 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
           />
         ) : (
           <>
-            {tab === TAB.LOGIN && <LoginForm onClose={onClose} />}
+            {tab === TAB.LOGIN && (
+              <LoginForm onClose={onClose} onForgotPassword={handleForgotPassword} />
+            )}
             {tab === TAB.REGISTER && <RegisterForm onOtpStep={handleOtpStep} />}
 
             {/* Divider */}
