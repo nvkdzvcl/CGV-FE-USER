@@ -94,7 +94,7 @@ button {
 }
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 22px rgba(255, 43, 84, 0.45);
+  box-shadow: 0 6px 22px rgba(231, 26, 15, 0.45);
   filter: brightness(1.05);
 }
 .btn-primary:active {
@@ -129,9 +129,9 @@ button {
   border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: 600;
-  background: rgba(255, 43, 84, 0.15);
+  background: rgba(231, 26, 15, 0.15);
   color: var(--primary-hover);
-  border: 1px solid rgba(255, 43, 84, 0.3);
+  border: 1px solid rgba(231, 26, 15, 0.3);
 }
 
 .badge-outline {
@@ -152,6 +152,13 @@ button {
   grid-template-columns: 260px 1fr;
   gap: 28px;
   margin-top: 24px;
+  /* Critical: prevent horizontal overflow */
+  min-width: 0;
+  overflow: hidden;
+}
+.page-with-sidebar > main {
+  min-width: 0;
+  overflow: hidden;
 }
 @media (max-width: 1024px) {
   .page-with-sidebar {

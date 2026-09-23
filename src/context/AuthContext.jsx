@@ -42,6 +42,42 @@ export function AuthProvider({ children }) {
   const [tokens, setTokens] = useState(() => getTokens());
   const [currentUser, setCurrentUser] = useState(() => getSavedUser());
 
+  // Đồng bộ tokens và session qua Custom Events và localStorage storage event giữa các tabs
+  useEffect(() => {
+    const handleTokensUpdated = (e) => {
+      if (e.detail) {
+        setTokens(e.detail);
+      }
+    };
+    const handleSessionExpired = () => {
+      setTokens(null);
+      setCurrentUser(null);
+    };
+    const handleStorage = (e) => {
+      if (e.key === 'cgv_auth_tokens') {
+        try {
+          const updated = e.newValue ? JSON.parse(e.newValue) : null;
+          setTokens(updated);
+        } catch { }
+      } else if (e.key === 'cgv_user') {
+        try {
+          const updatedUser = e.newValue ? JSON.parse(e.newValue) : null;
+          setCurrentUser(updatedUser);
+        } catch { }
+      }
+    };
+
+    window.addEventListener('cgv_tokens_updated', handleTokensUpdated);
+    window.addEventListener('cgv_session_expired', handleSessionExpired);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('cgv_tokens_updated', handleTokensUpdated);
+      window.removeEventListener('cgv_session_expired', handleSessionExpired);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
   // Lưu tokens vào localStorage mỗi khi thay đổi
   useEffect(() => {
     if (tokens) {
@@ -60,16 +96,19 @@ export function AuthProvider({ children }) {
   // Auto refresh token trước khi hết hạn
   // ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!tokens?.accessToken || !tokens?.expiresIn) return;
+    if (!tokens?.accessToken) return;
 
-    // Decode để tính thời gian còn lại
+    // Decode JWT để tính thời gian hết hạn chính xác
     const payload = decodeJwtPayload(tokens.accessToken);
-    const expMs = (payload.exp || 0) * 1000;
+    const expMs = (payload?.exp || 0) * 1000;
     const nowMs = Date.now();
-    const refreshAt = expMs - 60_000; // refresh 60s trước khi hết hạn
+
+    if (!expMs || expMs <= 0) return;
+
+    // Lên lịch refresh trước khi token hết hạn 60 giây (hoặc ngay nếu đã quá hạn)
+    const refreshAt = expMs > nowMs ? expMs - 60_000 : nowMs;
 
     if (refreshAt <= nowMs) {
-      // Token đã gần hết / hết hạn → thử refresh ngay
       handleTokenRefresh();
       return;
     }
@@ -83,7 +122,11 @@ export function AuthProvider({ children }) {
     if (!tokens?.refreshToken) return;
     try {
       const newTokens = await apiRefreshToken(tokens.refreshToken);
-      setTokens(newTokens);
+      setTokens(prev => ({
+        ...prev,
+        ...newTokens,
+        refreshToken: newTokens?.refreshToken || prev?.refreshToken,
+      }));
     } catch {
       // Refresh token hết hạn → buộc logout
       handleLogout(false);

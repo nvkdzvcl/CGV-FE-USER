@@ -546,11 +546,20 @@
 }
 
 .schedule-slot-btn:hover {
-  background: #e71a0f;
-  border-color: #ff3344;
+  background: rgba(231, 26, 15, 0.16);
+  border-color: #e71a0f;
   color: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(231, 26, 15, 0.4);
+  box-shadow: 0 6px 20px rgba(231, 26, 15, 0.35);
+}
+
+.schedule-slot-btn:hover .schedule-slot-time {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+.schedule-slot-btn:hover .schedule-slot-seats {
+  color: #cbd5e1;
 }
 
 .schedule-slot-format {
@@ -644,67 +653,238 @@
   to { opacity: 1; }
 }
 
-.trailer-modal-content {
+.trailer-modal-wrapper {
   position: relative;
-  width: 100%;
-  max-width: 960px;
-  background: #14161f;
-  border: 1px solid #2d3345;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(231, 26, 15, 0.25);
+  width: 94vw;
+  max-width: 1260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.trailer-modal-header {
+.trailer-modal-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid #232738;
-  background: #10121a;
+  width: 100%;
+  padding: 4px 6px;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.trailer-modal-topbar.hidden {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.trailer-modal-topbar.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.trailer-modal-wrapper:hover .trailer-modal-topbar {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.trailer-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.trailer-badge {
+  background: #e71a0f;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .trailer-modal-title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: #fff;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
-.trailer-modal-close {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ccc;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+.trailer-modal-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.trailer-modal-close:hover {
+.trailer-modal-rotate-btn {
+  background: rgba(231, 26, 15, 0.2);
+  border: 1px solid rgba(231, 26, 15, 0.45);
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.trailer-modal-rotate-btn:hover {
+  background: #e71a0f;
+  border-color: #ff3344;
+  transform: scale(1.05);
+  box-shadow: 0 0 14px rgba(231, 26, 15, 0.6);
+}
+
+.trailer-modal-close-btn {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  padding: 7px 16px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.trailer-modal-close-btn:hover {
   background: #e71a0f;
   border-color: #ff3344;
   color: #fff;
+  transform: scale(1.05);
+  box-shadow: 0 0 16px rgba(231, 26, 15, 0.5);
 }
 
-.trailer-modal-body {
+.trailer-modal-video-frame {
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
   background: #000;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.95), 0 0 45px rgba(231, 26, 15, 0.3);
 }
 
 .trailer-iframe {
   width: 100%;
   height: 100%;
   border: none;
+  display: block;
+}
+
+/* ─── Chế độ Xoay Ngang Màn Hình Ảo khi cầm điện thoại dọc ─── */
+.trailer-modal-wrapper.virtual-landscape {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 95vh !important;
+  max-width: 95vh !important;
+  height: 95vw !important;
+  max-height: 95vw !important;
+  transform: translate(-50%, -50%) rotate(90deg) !important;
+  transform-origin: center center !important;
+  z-index: 10001 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+
+.trailer-modal-wrapper.virtual-landscape .trailer-modal-video-frame {
+  width: 100% !important;
+  height: calc(100% - 42px) !important;
+  aspect-ratio: unset !important;
+  border-radius: 10px !important;
+}
+
+.trailer-modal-wrapper.virtual-landscape .trailer-iframe {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ─── Responsive Mobile Portrait (< 768px) ─── */
+@media (max-width: 768px) {
+  .trailer-modal-backdrop {
+    padding: 8px;
+  }
+
+  .trailer-modal-wrapper:not(.virtual-landscape) {
+    width: 100%;
+    max-width: 100vw;
+    gap: 8px;
+  }
+
+  .trailer-badge {
+    display: none; /* Ẩn huy hiệu để không đè tên phim */
+  }
+
+  .trailer-modal-title {
+    font-size: 0.92rem;
+    max-width: 130px;
+  }
+
+  .trailer-modal-rotate-btn,
+  .trailer-modal-close-btn {
+    padding: 5px 10px;
+    font-size: 0.76rem;
+    gap: 4px;
+  }
+
+  .trailer-modal-video-frame {
+    border-radius: 10px;
+  }
+}
+
+/* ─── Khi điện thoại thật sự xoay ngang (Physical Landscape) ─── */
+@media (max-width: 950px) and (orientation: landscape) {
+  .trailer-modal-backdrop {
+    padding: 0 !important;
+    background: #000 !important;
+  }
+
+  .trailer-modal-wrapper:not(.virtual-landscape) {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    gap: 0 !important;
+  }
+
+  .trailer-modal-topbar {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 10 !important;
+    padding: 8px 16px !important;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.85) 0%, transparent 100%) !important;
+  }
+
+  .trailer-modal-video-frame {
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    aspect-ratio: unset !important;
+  }
 }
 
 /* Mobile Enhancements for Movie Detail */

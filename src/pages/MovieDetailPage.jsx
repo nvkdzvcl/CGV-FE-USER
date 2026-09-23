@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Clock,
@@ -14,10 +14,14 @@ import {
   Video,
   MapPin,
   Share2,
-  AlertTriangle
+  AlertTriangle,
+  Layers,
+  Volume2
 } from "lucide-react";
-import { MOVIES, CINEMAS, SHOWTIME_SLOTS } from "../data/mockData";
+import { MOVIES, CINEMAS } from "../data/mockData";
+import { ApiService } from "../services/api";
 import TrailerModal from "../components/TrailerModal";
+import CgvAuraLoader from "../components/CgvAuraLoader";
 
 const AGE_CONFIG = {
   T18: {
@@ -52,6 +56,20 @@ const AGE_CONFIG = {
   }
 };
 
+const formatVnDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return dateStr;
+  }
+};
+
 const ROLE_LABELS = {
   DIRECTOR: "Đạo diễn",
   LEAD: "Vai chính",
@@ -59,17 +77,133 @@ const ROLE_LABELS = {
   CAMEO: "Khách mời"
 };
 
+// Chuẩn hóa link YouTube sang link nhúng phân giải cao 1080p
+function getYouTubeEmbedUrl(url) {
+  if (!url) return '';
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if (match && match[1]) {
+    return `https://www.youtube.com/embed/${match[1]}?vq=hd1080&hd=1&rel=0&modestbranding=1`;
+  }
+  if (url.includes('/embed/')) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}vq=hd1080&hd=1&rel=0&modestbranding=1`;
+  }
+  return url;
+}
+
+function generateNextDays(count = 7) {
+  const days = [];
+  const now = new Date();
+  const dayNames = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    let label = '';
+    if (i === 0) {
+      label = `Hôm nay (${day}.${month})`;
+    } else if (i === 1) {
+      label = `Ngày mai (${day}.${month})`;
+    } else {
+      label = `${dayNames[d.getDay()]} (${day}.${month})`;
+    }
+
+    days.push({
+      dateStr,
+      label,
+      dayNumber: day,
+      dayName: i === 0 ? 'Hôm nay' : (i === 1 ? 'Ngày mai' : dayNames[d.getDay()])
+    });
+  }
+  return days;
+}
+
+function normalizeFormat(fmt) {
+  if (!fmt) return '2D';
+  const upper = fmt.toString().toUpperCase().trim();
+  if (upper === 'FOUR_D' || upper === 'FOUR_DX' || upper === '4DX' || upper.includes('4D')) return '4DX';
+  if (upper === 'IMAX' || upper.includes('IMAX')) return 'IMAX';
+  if (upper === 'THREE_D' || upper === '3D') return '3D';
+  if (upper === 'SCREENX' || upper.includes('SCREEN')) return 'SCREENX';
+  return '2D';
+}
+
+function formatTime(isoString) {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Asia/Ho_Chi_Minh'
+    });
+  } catch {
+    return isoString;
+  }
+}
+
+function getViewingModeLabel(mode, slot) {
+  if (mode === 'DUBBED' || mode === 'LONG_TIENG') return 'Lồng tiếng';
+  if (mode === 'VOICEOVER' || mode === 'THUYET_MINH') return 'Thuyết minh';
+  if (mode === 'SUBTITLED' || mode === 'PHU_DE') return 'Phụ đề';
+  if (slot?.language?.toLowerCase().includes('lồng')) return 'Lồng tiếng';
+  return 'Phụ đề';
+}
+
 export default function MovieDetailPage({ onOpenBooking }) {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState("info");
-  const [selectedDate, setSelectedDate] = useState("Hôm nay");
   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
 
+  // 7 ngày chiếu động
+  const dateOptions = useMemo(() => generateNextDays(7), []);
+  const [selectedDateObj, setSelectedDateObj] = useState(dateOptions[0]);
+
+  // Bộ lọc format & mode
+  const [selectedFormat, setSelectedFormat] = useState('ALL');
+  const [selectedMode, setSelectedMode] = useState('ALL'); // 'ALL' | 'SUBTITLED' | 'DUBBED'
+
+  const [movie, setMovie] = useState(() => MOVIES.find((m) => m.id === id || m.id === Number(id)) || null);
+  const [scheduleData, setScheduleData] = useState(null);
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+
+  // 1. Tải chi tiết phim từ Backend
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+    ApiService.getMovieById(id)
+      .then(res => {
+        if (res) setMovie(res);
+      })
+      .catch(err => console.warn('Lỗi tải chi tiết phim từ backend:', err.message));
   }, [id]);
 
-  const movie = MOVIES.find((m) => m.id === id);
+  // 2. Tải lịch chiếu thật của phim này từ Backend
+  useEffect(() => {
+    if (!movie?.id) return;
+    let isMounted = true;
+    setIsLoadingSchedule(true);
+
+    ApiService.getMovieSchedule(movie.id, { date: selectedDateObj.dateStr })
+      .then(res => {
+        if (isMounted) setScheduleData(res || null);
+      })
+      .catch(err => {
+        console.warn('Lỗi tải lịch chiếu theo phim:', err.message);
+        if (isMounted) setScheduleData(null);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingSchedule(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [movie?.id, selectedDateObj.dateStr]);
 
   if (!movie) {
     return (
@@ -95,17 +229,6 @@ export default function MovieDetailPage({ onOpenBooking }) {
     desc: "Vui lòng xem quy định tại rạp."
   };
 
-  const handleBookSlot = (cinema, slot) => {
-    if (onOpenBooking) {
-      onOpenBooking({
-        movie,
-        cinema,
-        date: selectedDate,
-        timeSlot: slot
-      });
-    }
-  };
-
   const handleShare = async () => {
     if (navigator.share) {
       try {
@@ -114,7 +237,7 @@ export default function MovieDetailPage({ onOpenBooking }) {
           text: `Xem thông tin & lịch chiếu phim ${movie.title} tại cụm rạp CGV Cinema`,
           url: window.location.href
         });
-      } catch (_err) {
+      } catch {
         // user cancelled
       }
     } else {
@@ -132,6 +255,53 @@ export default function MovieDetailPage({ onOpenBooking }) {
   };
 
   const sortedCasts = movie.casts ? [...movie.casts].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)) : [];
+  const embedTrailerUrl = getYouTubeEmbedUrl(movie.trailerYoutubeUrl || movie.trailerUrl);
+
+  // Lọc danh sách cụm rạp & suất chiếu theo Format & Viewing Mode
+  const filteredCinemas = useMemo(() => {
+    const list = scheduleData?.cinemas || [];
+    if (list.length === 0) return [];
+
+    return list.map(c => {
+      const validSlots = (c.showtimes || []).filter(st => {
+        // Lọc format
+        if (selectedFormat !== 'ALL') {
+          const fmt = normalizeFormat(st.format);
+          if (fmt !== selectedFormat) return false;
+        }
+        // Lọc viewing mode
+        if (selectedMode !== 'ALL') {
+          const modeLabel = getViewingModeLabel(st.viewingMode, st);
+          if (selectedMode === 'DUBBED' && modeLabel !== 'Lồng tiếng') return false;
+          if (selectedMode === 'SUBTITLED' && modeLabel !== 'Phụ đề') return false;
+        }
+        return true;
+      });
+
+      return { ...c, showtimes: validSlots };
+    }).filter(c => c.showtimes.length > 0);
+  }, [scheduleData, selectedFormat, selectedMode]);
+
+  const handleSlotClick = (cinema, slot) => {
+    if (!onOpenBooking) return;
+    onOpenBooking({
+      movie,
+      cinema: {
+        id: cinema.cinemaId || cinema.id,
+        name: cinema.cinemaName || cinema.name,
+        address: cinema.address
+      },
+      showtime: slot,
+      showtimeId: slot.showtimeId || slot.id,
+      roomId: slot.roomId,
+      date: selectedDateObj.label,
+      dateIso: selectedDateObj.dateStr,
+      timeSlot: formatTime(slot.startTime),
+      format: normalizeFormat(slot.format),
+      viewingMode: getViewingModeLabel(slot.viewingMode, slot),
+      basePrice: slot.basePrice || 85000
+    });
+  };
 
   return (
     <div className="movie-detail-container">
@@ -144,24 +314,23 @@ export default function MovieDetailPage({ onOpenBooking }) {
         <span className="current">{movie.title}</span>
       </div>
 
-      {/* Hero Banner Section */}
-      <section
-        className="movie-detail-hero"
-        style={{
-          backgroundImage: `url(${movie.backdropUrl || movie.posterUrl})`
-        }}
-      >
-        <div className="movie-detail-hero-backdrop-overlay" />
+      {/* Hero Header Section */}
+      <div className="movie-detail-header">
+        <div className="movie-detail-backdrop-blur">
+          <img src={movie.backdropUrl || movie.posterUrl} alt="" className="backdrop-img" />
+          <div className="backdrop-gradient-overlay" />
+        </div>
 
-        <div className="movie-detail-hero-inner">
+        <div className="movie-detail-header-content">
           {/* Left Poster */}
-          <div className="movie-detail-poster-card">
-            <img src={movie.posterUrl} alt={movie.title} className="movie-detail-poster-img" />
-            {movie.trailerYoutubeUrl && (
+          <div className="movie-detail-poster-wrap">
+            <img src={movie.posterUrl} alt={movie.title} className="movie-detail-poster" />
+            {embedTrailerUrl && (
               <button
-                className="movie-detail-poster-play-btn"
+                type="button"
+                className="btn-trailer-circle-play"
                 onClick={() => setIsTrailerOpen(true)}
-                title="Bấm để phát Trailer"
+                title="Xem nhanh Trailer 1080p"
               >
                 <Play size={28} fill="#fff" />
               </button>
@@ -178,7 +347,7 @@ export default function MovieDetailPage({ onOpenBooking }) {
                     Đang chiếu tại các rạp
                   </>
                 ) : (
-                  `Dự kiến khởi chiếu ${movie.releaseDate || "Sắp tới"}`
+                  movie.releaseDate ? `Khởi chiếu: ${formatVnDate(movie.releaseDate)}` : "Sắp chiếu"
                 )}
               </span>
 
@@ -194,22 +363,22 @@ export default function MovieDetailPage({ onOpenBooking }) {
               <h2 className="movie-detail-title-original">{movie.originalTitle}</h2>
             )}
 
-            {/* Meta specs row */}
+            {/* Meta Specs Row */}
             <div className="movie-detail-meta-specs">
               <span className="movie-detail-meta-item">
                 <Clock size={16} />
-                <strong>{movie.duration} phút</strong>
+                <strong>{movie.durationMinutes || movie.duration || 120} phút</strong>
               </span>
 
               <span className="movie-detail-meta-item">
                 <Calendar size={16} />
-                Khởi chiếu: <strong>{movie.releaseDate}</strong>
+                Khởi chiếu: <strong>{formatVnDate(movie.releaseDate) || "Đang cập nhật"}</strong>
               </span>
 
               {movie.language && (
                 <span className="movie-detail-meta-item">
                   <Globe size={16} />
-                  Ngôn ngữ: <strong>{movie.language}</strong>
+                  Ngôn ngữ gốc: <strong>{movie.language}</strong>
                 </span>
               )}
 
@@ -219,12 +388,24 @@ export default function MovieDetailPage({ onOpenBooking }) {
                   Phụ đề: <strong>{movie.subtitle}</strong>
                 </span>
               )}
+
+              {movie.supportedModes && (
+                <span className="movie-detail-meta-item">
+                  <Film size={16} />
+                  Chế độ chiếu:{' '}
+                  {movie.supportedModes.split(',').map((mode, i) => (
+                    <strong key={i} className={`mode-badge-inline mode-${mode.trim().toLowerCase()}`}>
+                      {mode.trim() === 'SUBTITLED' ? 'Phụ đề' : mode.trim() === 'DUBBED' ? 'Lồng tiếng' : 'Thuyết minh'}
+                    </strong>
+                  ))}
+                </span>
+              )}
             </div>
 
             {/* Genres Tag List */}
             {movie.genre && (
               <div className="movie-detail-genres-list">
-                {movie.genre.map((g, idx) => (
+                {(Array.isArray(movie.genre) ? movie.genre : [movie.genre]).map((g, idx) => (
                   <span key={idx} className="genre-tag-pill">
                     {g}
                   </span>
@@ -249,36 +430,35 @@ export default function MovieDetailPage({ onOpenBooking }) {
                   onClick={() => alert("Phim sắp khởi chiếu. Bạn có thể theo dõi fanpage CGV để nhận lịch chiếu sớm nhất!")}
                 >
                   <Calendar size={18} />
-                  Sắp khởi chiếu ({movie.releaseDate})
+                  Sắp khởi chiếu {movie.releaseDate ? `(${formatVnDate(movie.releaseDate)})` : ""}
                 </button>
               )}
 
-              {movie.trailerYoutubeUrl && (
+              {embedTrailerUrl && (
                 <button
                   className="btn-detail-trailer"
                   onClick={() => setIsTrailerOpen(true)}
                 >
                   <Play size={18} fill="#fff" />
-                  Xem Trailer
+                  Xem Trailer HD
                 </button>
               )}
 
-              <button className="btn-detail-trailer" onClick={handleShare} title="Chia sẻ phim">
+              <button className="btn-detail-share" onClick={handleShare} title="Chia sẻ phim này">
                 <Share2 size={18} />
-                Chia sẻ
               </button>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Detail Navigation Tabs */}
-      <nav className="movie-detail-nav-tabs">
+      {/* Nav Tabs */}
+      <nav className="movie-detail-nav-bar">
         <div
           className={`movie-detail-nav-tab ${activeTab === "info" ? "active" : ""}`}
           onClick={() => scrollToSection("info")}
         >
-          Thông tin phim
+          Thông tin chi tiết
         </div>
         <div
           className={`movie-detail-nav-tab ${activeTab === "casts" ? "active" : ""}`}
@@ -306,7 +486,7 @@ export default function MovieDetailPage({ onOpenBooking }) {
       <div className="movie-detail-main">
         {/* Left Primary Column */}
         <div className="movie-detail-primary">
-          {/* Section 1: Synopsis (Tóm tắt kịch bản từ db.txt) */}
+          {/* Section 1: Synopsis */}
           <section id="section-info" className="detail-section-card">
             <h3 className="detail-section-title">
               <Info size={20} />
@@ -317,7 +497,7 @@ export default function MovieDetailPage({ onOpenBooking }) {
             </p>
           </section>
 
-          {/* Section 2: Movie Casts & Director (Dàn diễn viên từ db.txt movie_casts) */}
+          {/* Section 2: Movie Casts & Director */}
           <section id="section-casts" className="detail-section-card">
             <h3 className="detail-section-title">
               <Users size={20} />
@@ -351,26 +531,28 @@ export default function MovieDetailPage({ onOpenBooking }) {
             )}
           </section>
 
-          {/* Section 3: Official Trailer (trailer_youtube_url từ db.txt) */}
-          {movie.trailerYoutubeUrl && (
+          {/* Section 3: Official Trailer with 1080p Embed */}
+          {embedTrailerUrl && (
             <section id="section-trailer" className="detail-section-card">
               <h3 className="detail-section-title">
                 <Video size={20} />
-                Trailer chính thức
+                Trailer chính thức (Full HD 1080p)
               </h3>
-              <div className="inline-trailer-wrapper">
+              <div className="inline-trailer-wrapper" style={{ position: 'relative', paddingTop: '56.25%', borderRadius: 12, overflow: 'hidden', background: '#000' }}>
                 <iframe
-                  src={movie.trailerYoutubeUrl}
+                  src={embedTrailerUrl}
                   title={`Trailer ${movie.title}`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
-                  className="inline-trailer-iframe"
+                  style={{
+                    position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none'
+                  }}
                 />
               </div>
             </section>
           )}
 
-          {/* Section 4: Showtimes Schedule (Suất chiếu từ db.txt showtimes) */}
+          {/* Section 4: Showtimes Schedule — Real API + Responsive Grid */}
           <section id="section-showtimes" className="detail-section-card">
             <h3 className="detail-section-title">
               <Calendar size={20} />
@@ -379,73 +561,185 @@ export default function MovieDetailPage({ onOpenBooking }) {
 
             {isNowShowing ? (
               <div className="movie-showtime-schedule">
-                {/* Date Tabs */}
-                <div className="schedule-date-pills">
-                  {["Hôm nay", "Ngày mai", "Thứ 6 (18.09)", "Thứ 7 (19.09)", "Chủ nhật (20.09)"].map((d) => (
+                {/* 1. Dynamic Date Tabs */}
+                <div className="schedule-date-pills" style={{ overflowX: 'auto', paddingBottom: 8 }}>
+                  {dateOptions.map((d) => (
                     <button
-                      key={d}
-                      className={`schedule-date-pill ${selectedDate === d ? "active" : ""}`}
-                      onClick={() => setSelectedDate(d)}
+                      key={d.dateStr}
+                      className={`schedule-date-pill ${selectedDateObj.dateStr === d.dateStr ? "active" : ""}`}
+                      onClick={() => setSelectedDateObj(d)}
                     >
-                      {d}
+                      {d.label}
                     </button>
                   ))}
                 </div>
 
-                {/* Showtimes by Cinema */}
-                {CINEMAS.slice(0, 4).map((cinema) => (
-                  <div key={cinema.id} className="schedule-cinema-card">
-                    <div className="schedule-cinema-head">
-                      <div>
-                        <div className="schedule-cinema-name">{cinema.name}</div>
-                        <div className="schedule-cinema-addr">
-                          <MapPin size={13} color="var(--primary)" />
-                          {cinema.address}
+                {/* 2. Format & Mode Filter Bar */}
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '16px 0 20px 0', alignItems: 'center' }}>
+                  {/* Format Pills */}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Định dạng:</span>
+                    {['ALL', '2D', '3D', 'IMAX', '4DX'].map(fmt => (
+                      <button
+                        key={fmt}
+                        type="button"
+                        className={`format-pill ${selectedFormat === fmt ? 'active' : ''}`}
+                        onClick={() => setSelectedFormat(fmt)}
+                        style={{
+                          padding: '4px 10px', fontSize: '0.75rem', borderRadius: 6,
+                          border: selectedFormat === fmt ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)',
+                          background: selectedFormat === fmt ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                          color: '#fff', cursor: 'pointer', fontWeight: 700
+                        }}
+                      >
+                        {fmt === 'ALL' ? 'Tất cả' : fmt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Viewing Mode Pills (Text only, no emoji) */}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>Hình thức:</span>
+                    {[
+                      { id: 'ALL', label: 'Tất cả' },
+                      { id: 'SUBTITLED', label: 'Phụ đề' },
+                      { id: 'DUBBED', label: 'Lồng tiếng' }
+                    ].map(mode => (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setSelectedMode(mode.id)}
+                        style={{
+                          padding: '4px 10px', fontSize: '0.75rem', borderRadius: 6,
+                          border: selectedMode === mode.id ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)',
+                          background: selectedMode === mode.id ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.05)',
+                          color: selectedMode === mode.id ? '#38bdf8' : '#cbd5e1', cursor: 'pointer', fontWeight: 600
+                        }}
+                      >
+                        {mode.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 3. Schedule Content */}
+                {isLoadingSchedule ? (
+                  <div style={{ padding: '50px 20px', display: 'flex', justifyContent: 'center' }}>
+                    <CgvAuraLoader size="md" text="Đang tải lịch chiếu từ hệ thống CGV..." />
+                  </div>
+                ) : filteredCinemas.length === 0 ? (
+                  <div className="schedule-empty-box" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <Film size={36} style={{ opacity: 0.35, margin: '0 auto 10px' }} />
+                    <h4 style={{ color: '#fff', marginBottom: 6 }}>Không có suất chiếu phù hợp</h4>
+                    <p style={{ fontSize: '0.86rem' }}>
+                      Vui lòng thử chọn ngày chiếu khác hoặc thay đổi bộ lọc định dạng / hình thức.
+                    </p>
+                  </div>
+                ) : (
+                  filteredCinemas.map((cinema) => (
+                    <div key={cinema.cinemaId || cinema.id} className="schedule-cinema-card" style={{ marginBottom: 20 }}>
+                      <div className="schedule-cinema-head" style={{ marginBottom: 14 }}>
+                        <div>
+                          <div className="schedule-cinema-name" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#fff' }}>
+                            {cinema.cinemaName || cinema.name}
+                          </div>
+                          <div className="schedule-cinema-addr" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <MapPin size={13} color="var(--primary)" />
+                            {cinema.address}
+                          </div>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <span className="badge-outline">2D Phụ đề</span>
+
+                      {/* Responsive Grid of Showtime Slots */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                        gap: 10
+                      }}>
+                        {cinema.showtimes.map((slot) => {
+                          const fmt = normalizeFormat(slot.format);
+                          const modeLabel = getViewingModeLabel(slot.viewingMode, slot);
+                          const isDub = modeLabel === 'Lồng tiếng';
+
+                          return (
+                            <button
+                              key={slot.showtimeId || slot.id}
+                              type="button"
+                              onClick={() => handleSlotClick(cinema, slot)}
+                              style={{
+                                background: '#131826',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: 10,
+                                padding: '10px 8px',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 4,
+                                transition: 'all 0.2s'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.borderColor = 'var(--primary)';
+                                e.currentTarget.style.background = 'rgba(231, 26, 15, 0.12)';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                e.currentTarget.style.background = '#131826';
+                                e.currentTarget.style.transform = 'none';
+                              }}
+                            >
+                              <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>
+                                {formatTime(slot.startTime)}
+                              </span>
+
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <span style={{
+                                  fontSize: '0.68rem', fontWeight: 700, padding: '1px 5px',
+                                  borderRadius: 4, background: 'rgba(255,255,255,0.1)', color: '#cbd5e1'
+                                }}>
+                                  {fmt}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.68rem', fontWeight: 600, padding: '1px 5px',
+                                  borderRadius: 4,
+                                  background: isDub ? 'rgba(245, 158, 11, 0.16)' : 'rgba(59, 130, 246, 0.16)',
+                                  color: isDub ? '#fbbf24' : '#60a5fa'
+                                }}>
+                                  {modeLabel}
+                                </span>
+                              </div>
+
+                              <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: 2 }}>
+                                {slot.availableSeats != null ? `${slot.availableSeats} ghế` : 'Còn vé'}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-
-                    <div className="schedule-slots-group">
-                      {SHOWTIME_SLOTS.map((slot) => (
-                        <button
-                          key={slot}
-                          className="schedule-slot-btn"
-                          onClick={() => handleBookSlot(cinema, slot)}
-                          title="Bấm để chọn ghế và đặt vé"
-                        >
-                          <span>{slot}</span>
-                          <span className="schedule-slot-format">2D</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             ) : (
-              <div style={{ textAlign: "center", padding: "30px 20px", color: "#94a3b8" }}>
-                <Calendar size={40} style={{ margin: "0 auto 12px", opacity: 0.6 }} />
-                <p style={{ fontSize: "1.05rem", color: "#fff", marginBottom: 6 }}>
-                  Phim dự kiến khởi chiếu vào ngày <strong>{movie.releaseDate}</strong>
-                </p>
-                <p style={{ fontSize: "0.88rem" }}>
-                  Lịch chiếu chính thức sẽ được mở trước ngày khởi chiếu 3 ngày.
-                </p>
+              <div style={{ padding: '30px 0', textAlign: 'center', color: '#94a3b8' }}>
+                <p>Phim hiện chưa mở bán suất chiếu chính thức.</p>
               </div>
             )}
           </section>
         </div>
 
-        {/* Right Sidebar: Specifications & Regulatory Info */}
-        <aside className="movie-specs-sidebar">
-          {/* Detailed Specs based on db.txt */}
+        {/* Right Sidebar Specs */}
+        <aside className="movie-detail-sidebar">
+          {/* Movie Specs Card */}
           <div className="detail-section-card">
-            <h4 className="detail-section-title" style={{ fontSize: "1.05rem", marginBottom: 14 }}>
-              Thông tin kỹ thuật
-            </h4>
-            <div className="specs-list">
+            <h3 className="detail-section-title">
+              <Film size={20} />
+              Thông số kĩ thuật
+            </h3>
+
+            <div className="movie-specs-list">
               <div className="spec-item">
                 <span className="spec-label">Đạo diễn</span>
                 <span className="spec-value">{movie.director || "Đang cập nhật"}</span>
@@ -458,23 +752,23 @@ export default function MovieDetailPage({ onOpenBooking }) {
 
               <div className="spec-item">
                 <span className="spec-label">Thể loại</span>
-                <span className="spec-value">{movie.genre ? movie.genre.join(", ") : "Điện ảnh"}</span>
+                <span className="spec-value">{Array.isArray(movie.genre) ? movie.genre.join(", ") : (movie.genre || "Điện ảnh")}</span>
               </div>
 
               <div className="spec-item">
                 <span className="spec-label">Thời lượng</span>
-                <span className="spec-value">{movie.duration} phút</span>
+                <span className="spec-value">{movie.durationMinutes || movie.duration || 120} phút</span>
               </div>
 
               <div className="spec-item">
                 <span className="spec-label">Khởi chiếu</span>
-                <span className="spec-value">{movie.releaseDate || "Đang cập nhật"}</span>
+                <span className="spec-value">{formatVnDate(movie.releaseDate) || "Đang cập nhật"}</span>
               </div>
 
               {movie.endDate && (
                 <div className="spec-item">
                   <span className="spec-label">Kết thúc dự kiến</span>
-                  <span className="spec-value">{movie.endDate}</span>
+                  <span className="spec-value">{formatVnDate(movie.endDate)}</span>
                 </div>
               )}
 
@@ -487,6 +781,31 @@ export default function MovieDetailPage({ onOpenBooking }) {
                 <span className="spec-label">Phụ đề</span>
                 <span className="spec-value">{movie.subtitle || "Tiếng Việt"}</span>
               </div>
+
+              {movie.supportedModes && (
+                <div className="spec-item">
+                  <span className="spec-label">Chế độ xem</span>
+                  <span className="spec-value">
+                    {movie.supportedModes.split(',').map((mode, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          display: 'inline-block',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          padding: '2px 7px',
+                          borderRadius: 4,
+                          marginRight: 4,
+                          background: mode.trim() === 'DUBBED' ? 'rgba(245, 158, 11, 0.16)' : 'rgba(59, 130, 246, 0.16)',
+                          color: mode.trim() === 'DUBBED' ? '#fbbf24' : '#60a5fa'
+                        }}
+                      >
+                        {mode.trim() === 'DUBBED' ? 'Lồng tiếng' : mode.trim() === 'SUBTITLED' ? 'Phụ đề' : 'Thuyết minh'}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              )}
 
               {movie.country && (
                 <div className="spec-item">
@@ -523,13 +842,15 @@ export default function MovieDetailPage({ onOpenBooking }) {
         </aside>
       </div>
 
-      {/* Trailer Modal Popup */}
-      <TrailerModal
-        isOpen={isTrailerOpen}
-        onClose={() => setIsTrailerOpen(false)}
-        trailerUrl={movie.trailerYoutubeUrl}
-        title={movie.title}
-      />
+      {/* Trailer Modal Popup (1080p) */}
+      {isTrailerOpen && embedTrailerUrl && (
+        <TrailerModal
+          isOpen={isTrailerOpen}
+          onClose={() => setIsTrailerOpen(false)}
+          videoUrl={embedTrailerUrl}
+          movieTitle={movie.title}
+        />
+      )}
     </div>
   );
 }

@@ -786,3 +786,365 @@
   color: #fff;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE DESIGN FOR TABLETS & MOBILE (<= 768px & <= 480px)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  .profile-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 14px 12px 60px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  /* ── 1. Mock Mode Banner ── */
+  .profile-mock-banner {
+    padding: 12px;
+    margin-bottom: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .profile-mock-text {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .profile-mock-badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+
+  .profile-mock-controls {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .tier-switcher {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    padding: 2px;
+  }
+
+  .tier-btn {
+    flex: 1;
+    padding: 5px 4px;
+    font-size: 0.72rem;
+    text-align: center;
+  }
+
+  .btn-reset-mock {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    font-size: 0.74rem;
+    white-space: nowrap;
+  }
+
+  /* ── 2. Profile Hero Card ── */
+  .profile-hero {
+    padding: 18px 16px;
+    margin-bottom: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    border-radius: 14px;
+  }
+
+  .profile-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .profile-avatar-wrap {
+    width: 70px;
+    height: 70px;
+    min-width: 70px;
+  }
+
+  .profile-avatar {
+    font-size: 1.8rem;
+  }
+
+  .profile-avatar-badge {
+    width: 24px;
+    height: 24px;
+  }
+
+  .profile-hero-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .profile-hero-info h2 {
+    font-size: 1.25rem;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    word-break: break-word;
+  }
+
+  .profile-tier-badge {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+  }
+
+  .profile-hero-info p {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .profile-hero-stats {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .profile-stat-box {
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    text-align: left;
+  }
+
+  .profile-stat-box .stat-label {
+    font-size: 0.68rem;
+    margin-bottom: 2px;
+  }
+
+  .profile-stat-box .stat-value {
+    font-size: 1.05rem;
+  }
+
+  /* ── 3. Navigation Tabs as Balanced 2-Column Grid (Hiển thị đầy đủ cả 5 mục) ── */
+  .profile-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .profile-nav-sidebar {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    padding: 10px !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-lg) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .profile-nav-btn {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    padding: 10px 12px !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    color: var(--text-secondary) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: var(--radius-md) !important;
+    gap: 8px !important;
+    text-align: left !important;
+    box-sizing: border-box !important;
+    min-height: 44px !important;
+    line-height: 1.25 !important;
+    white-space: normal !important;
+    transition: all var(--transition-fast) !important;
+  }
+
+  .profile-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #ffffff !important;
+  }
+
+  .profile-nav-btn.active {
+    background: var(--primary-gradient) !important;
+    color: #ffffff !important;
+    border-color: rgba(231, 26, 15, 0.45) !important;
+    box-shadow: 0 4px 15px var(--primary-glow) !important;
+    font-weight: 700 !important;
+  }
+
+  /* Mục thứ 5 (Tài khoản liên kết) trải rộng 2 cột căn giữa tuyệt đẹp */
+  .profile-nav-btn:last-child {
+    grid-column: span 2 !important;
+    justify-content: center !important;
+  }
+
+  .profile-nav-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* ── 4. Main Profile Card ── */
+  .profile-card {
+    padding: 18px 14px;
+    border-radius: 14px;
+    overflow-x: hidden;
+  }
+
+  .profile-card-header {
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+  }
+
+  .profile-card-header h3 {
+    font-size: 1.15rem;
+  }
+
+  .profile-card-header p {
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  .profile-form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .profile-btn-group {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+
+  .profile-btn-group button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* ── 5. Membership Tab on Mobile ── */
+  .membership-card-wrap {
+    padding: 10px 0;
+  }
+
+  .membership-card {
+    min-height: 190px;
+    padding: 18px;
+  }
+
+  .membership-tier-name {
+    font-size: 1.35rem;
+  }
+
+  .membership-card-number {
+    font-size: 1rem;
+    letter-spacing: 2px;
+  }
+
+  .membership-benefits-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* ── 6. Social Connect Accounts on Mobile (Fixed 100% No Truncation) ── */
+  .social-connect-item {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px;
+    gap: 12px;
+    border-radius: 12px;
+  }
+
+  .social-connect-left {
+    width: 100%;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .social-connect-icon {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+  }
+
+  .social-connect-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .social-connect-info h4 {
+    font-size: 0.95rem;
+    margin: 0 0 2px;
+  }
+
+  .social-connect-info p {
+    font-size: 0.78rem;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .social-connect-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 10px;
+  }
+
+  .social-status-badge {
+    font-size: 0.76rem;
+    padding: 4px 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-connect {
+    flex: 1;
+    text-align: center;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 420px) {
+  .profile-hero-info h2 {
+    font-size: 1.1rem;
+  }
+
+  .profile-nav-btn {
+    font-size: 0.76rem !important;
+    padding: 8px 8px !important;
+  }
+}
+

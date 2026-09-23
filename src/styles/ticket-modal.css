@@ -1,0 +1,583 @@
+/* ─── Ticket Detail Modal & Printable Ticket CSS ─── */
+
+.ticket-modal-backdrop {
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  overflow-x: hidden;
+}
+
+.ticket-modal-card {
+  width: 100%;
+  max-width: 440px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  background: #18191c;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+  overflow: hidden !important;
+  box-sizing: border-box;
+  animation: ticketModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ticketModalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ticket-modal-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: #121316;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+.ticket-modal-top-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.ticket-modal-top-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-ticket-print {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(231, 26, 15, 0.15);
+  color: #e71a0f;
+  border: 1px solid rgba(231, 26, 15, 0.3);
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-ticket-print:hover {
+  background: #e71a0f;
+  color: #fff;
+  border-color: #e71a0f;
+}
+
+.btn-ticket-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-ticket-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Paper Ticket Wrapper (100% no horizontal scroll) ─── */
+.ticket-paper-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden !important;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 18px 20px;
+  background: #ffffff;
+  color: #1a1a1a;
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.ticket-paper-header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.cgv-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.cgv-logo-text {
+  background: #e71a0f;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 1.25rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+
+.cgv-cinemas-text {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #1a1a1a;
+  letter-spacing: 2px;
+}
+
+.ticket-paper-type {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #555555;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.ticket-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+.status-confirmed {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.status-pending {
+  background: #fff8e1;
+  color: #f57f17;
+  border: 1px solid #ffe082;
+}
+
+.ticket-dashed-separator {
+  height: 1px;
+  border-top: 1px dashed #d1d5db;
+  margin: 12px 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-customer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f9fafb;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+  box-sizing: border-box;
+}
+
+.ticket-customer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.84rem;
+}
+
+/* ─── Ticket Body ─── */
+.ticket-body {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-movie-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #111827;
+  text-align: center;
+  margin-bottom: 12px;
+  line-height: 1.3;
+}
+
+.ticket-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ticket-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.86rem;
+  box-sizing: border-box;
+}
+
+.ticket-info-item.address-item {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.address-val {
+  font-size: 0.78rem !important;
+  color: #4b5563 !important;
+  line-height: 1.35;
+  text-align: right;
+  flex: 1;
+  word-break: break-word;
+}
+
+.ticket-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #6b7280;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.ticket-val {
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+  word-break: break-word;
+}
+
+.ticket-seats-highlight {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 2px 8px;
+  border-radius: 5px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.ticket-finance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.ticket-finance-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.ticket-finance-total {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #e71a0f;
+}
+
+.ticket-finance-discount {
+  font-size: 0.78rem;
+  color: #059669;
+  font-weight: 600;
+  text-align: right;
+  margin-top: 2px;
+}
+
+.ticket-code-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.74rem;
+  color: #9ca3af;
+}
+
+.ticket-code-row code {
+  font-family: monospace;
+  font-weight: 600;
+  color: #4b5563;
+  font-size: 0.72rem;
+  word-break: break-all;
+}
+
+/* ─── Perforated Line (clean no overflow) ─── */
+.ticket-perforated-edge {
+  position: relative;
+  height: 16px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.perforated-line {
+  width: 100%;
+  height: 1px;
+  border-top: 2px dashed #e5e7eb;
+}
+
+/* ─── Barcode & QR Code Section ─── */
+.ticket-barcode-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-top: 2px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.scanner-instruction {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f3f4f6;
+  color: #4b5563;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.scanner-icon {
+  color: #e71a0f;
+  flex-shrink: 0;
+}
+
+.barcode-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 8px 6px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.barcode-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.barcode-svg {
+  width: 100%;
+  max-width: 270px;
+  height: 48px;
+  display: block;
+}
+
+.barcode-text {
+  font-family: monospace;
+  font-size: 0.8rem;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: #111827;
+  margin-top: 4px;
+}
+
+.qr-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ticket-qr-img {
+  width: 105px;
+  height: 105px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  padding: 3px;
+  background: #fff;
+  display: block;
+}
+
+.qr-caption {
+  font-size: 0.72rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.ticket-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #9ca3af;
+  line-height: 1.35;
+  text-align: center;
+  padding: 0 4px;
+}
+
+/* ─── Footer ─── */
+.ticket-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 18px;
+  background: #121316;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+}
+
+/* ─── PRINT MEDIA CSS (Căn giữa trang A4, đúng 1 trang, giao diện vé rạp chuyên nghiệp) ─── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 15mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+
+  .navbar,
+  .profile-layout,
+  header,
+  footer,
+  .no-print,
+  .ticket-modal-top-bar,
+  .ticket-modal-footer {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Đảm bảo đường dẫn DOM tới printable-ticket luôn hiển thị */
+  #root,
+  .profile-page,
+  .ticket-modal-backdrop,
+  .ticket-modal-card {
+    visibility: visible !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  #printable-ticket,
+  #printable-ticket * {
+    visibility: visible !important;
+  }
+
+  #printable-ticket {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 440px !important;
+    margin: 10px auto !important;
+    padding: 20px 24px !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 2px dashed #9ca3af !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box !important;
+  }
+
+  .ticket-paper-header {
+    margin-bottom: 6px !important;
+  }
+
+  .cgv-logo-text {
+    background: #e71a0f !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .status-confirmed {
+    background: #e8f5e9 !important;
+    color: #166534 !important;
+    border: 1px solid #86efac !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .ticket-customer-section {
+    background: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+    padding: 8px 12px !important;
+    margin: 4px 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .ticket-movie-title {
+    font-size: 1.3rem !important;
+    color: #000000 !important;
+    margin-bottom: 10px !important;
+  }
+
+  .ticket-seats-highlight {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .barcode-wrapper {
+    border: 1px solid #d1d5db !important;
+    padding: 6px 10px !important;
+  }
+
+  .barcode-svg {
+    max-width: 280px !important;
+    height: 46px !important;
+  }
+
+  .ticket-qr-img {
+    width: 95px !important;
+    height: 95px !important;
+  }
+
+  .scanner-instruction {
+    background: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

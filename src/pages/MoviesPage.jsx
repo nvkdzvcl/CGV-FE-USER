@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Film, Flame, RotateCcw, X, SlidersHorizontal } from 'lucide-react';
 import MovieCard from '../components/MovieCard';
 import { MOVIES, CINEMAS } from '../data/mockData';
+import { ApiService } from '../services/api';
 
 const ALL_GENRES = [
   'Hành động', 'Phiêu lưu', 'Kinh dị', 'Tâm lý', 'Hài hước',
@@ -22,12 +23,21 @@ export default function MoviesPage({ onOpenBooking }) {
   const searchQ = searchParams.get('q') || '';
   const initialStatus = searchParams.get('status') === 'soon' ? 'COMING_SOON' : 'ALL';
 
+  const [movieList, setMovieList] = useState(MOVIES);
   const [activeTab, setActiveTab] = useState(initialStatus);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState([]);
   const [selectedCountry, setSelectedCountry] = useState('ALL');
   const [selectedAge, setSelectedAge] = useState('ALL');
   const [sortBy, setSortBy] = useState('newest');
+
+  useEffect(() => {
+    ApiService.getMovies().then(res => {
+      if (Array.isArray(res) && res.length > 0) {
+        setMovieList(res);
+      }
+    }).catch(e => console.warn('Using fallback movies in MoviesPage:', e.message));
+  }, []);
 
   const toggleGenre = (genre) => {
     if (selectedGenres.includes(genre)) {
@@ -50,7 +60,7 @@ export default function MoviesPage({ onOpenBooking }) {
   const selectedAgeConfig = ALL_AGE_RATINGS.find(a => a.code === selectedAge);
 
   const filteredMovies = useMemo(() => {
-    return MOVIES.filter(m => {
+    return movieList.filter(m => {
       // Search term
       if (searchQ && !m.title.toLowerCase().includes(searchQ.toLowerCase())) {
         return false;
@@ -69,8 +79,8 @@ export default function MoviesPage({ onOpenBooking }) {
       if (selectedAge !== 'ALL' && m.ageRating !== selectedAge) return false;
       return true;
     }).sort((a, b) => {
-      if (sortBy === 'duration-desc') return b.duration - a.duration;
-      if (sortBy === 'duration-asc') return a.duration - b.duration;
+      if (sortBy === 'duration-desc') return (b.durationMinutes || b.duration || 0) - (a.durationMinutes || a.duration || 0);
+      if (sortBy === 'duration-asc') return (a.durationMinutes || a.duration || 0) - (b.durationMinutes || b.duration || 0);
       return 0; // default newest
     });
   }, [searchQ, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
