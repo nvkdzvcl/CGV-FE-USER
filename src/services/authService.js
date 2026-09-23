@@ -102,15 +102,99 @@ export async function socialSync(accessToken, fullName) {
 
 /**
  * Refresh access token.
- * @param {string} refreshToken
+ * Hỗ trợ fallback trực tiếp Keycloak nếu backend identity-service bận hoặc khởi động lại.
+ * @param {string} refreshTokenValue
  * @returns {Promise<{ accessToken, refreshToken, expiresIn, authenticated }>}
  */
 export async function refreshToken(refreshTokenValue) {
-  const res = await authRequest(`${AUTH_BASE}/refresh`, {
-    method: 'POST',
-    body: JSON.stringify({ refreshToken: refreshTokenValue }),
+  // 1. Thử refresh qua Backend API (Kong Gateway -> identity-service)
+  try {
+    const res = await authRequest(`${AUTH_BASE}/refresh`, {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken: refreshTokenValue }),
+    });
+    if (res?.data?.accessToken) {
+      return res.data;
+    }
+  } catch (backendErr) {
+    console.warn('[refreshToken] Backend refresh failed, trying Keycloak directly...', backendErr.message);
+  }
+
+  // 2. Fallback: Trực tiếp Keycloak Token Endpoint
+  const keycloakBase = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8180';
+  const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'cgv-realm';
+  const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'CGV_App';
+  const clientSecret = '2doTmSyizJFxCmngTmi0XrJQ6ksr4uV5';
+
+  const bodyParams = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshTokenValue,
   });
-  return res.data;
+
+  const response = await fetch(`${keycloakBase}/realms/${realm}/protocol/openid-connect/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: bodyParams.toString(),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error_description || data.error || 'Phiên làm việc đã hết hạn');
+  }
+
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token || refreshTokenValue,
+    expiresIn: data.expires_in,
+    authenticated: true,
+  };
+}
+
+/**
+ * Đổi Authorization Code lấy Access Token + Refresh Token (Authorization Code Flow).
+ * @param {string} code
+ * @param {string} [redirectUri]
+ * @returns {Promise<{ accessToken: string, refreshToken: string, idToken?: string, expiresIn: number, authenticated: boolean }>}
+ */
+export async function exchangeCodeForTokens(code, redirectUri) {
+  const finalRedirectUri = redirectUri || `${window.location.origin}/oauth/callback`;
+  const keycloakBase = import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8180';
+  const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'cgv-realm';
+  const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'CGV_App';
+  const clientSecret = '2doTmSyizJFxCmngTmi0XrJQ6ksr4uV5';
+
+  const bodyParams = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    redirect_uri: finalRedirectUri,
+  });
+
+  const response = await fetch(`${keycloakBase}/realms/${realm}/protocol/openid-connect/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: bodyParams.toString(),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error_description || data.error || 'Xác thực mã Authorization Code thất bại');
+  }
+
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    idToken: data.id_token,
+    expiresIn: data.expires_in,
+    authenticated: true,
+  };
 }
 
 /**
@@ -126,7 +210,7 @@ export async function logout(refreshTokenValue) {
 }
 
 // ───────────────────────────────────────────────
-// Keycloak Social Login URLs
+// Keycloak Social Login URLs (Authorization Code Flow)
 // ───────────────────────────────────────────────
 
 export function buildSocialLoginUrl(provider) {
@@ -138,15 +222,13 @@ export function buildSocialLoginUrl(provider) {
   const redirectUri = encodeURIComponent(
     `${window.location.origin}/oauth/callback`
   );
-  const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
   return (
     `${keycloakBase}/realms/${realm}/protocol/openid-connect/auth` +
     `?client_id=${clientId}` +
     `&redirect_uri=${redirectUri}` +
-    `&response_type=id_token+token` +
+    `&response_type=code` +
     `&scope=openid+profile+email` +
     `&kc_idp_hint=${provider}` +
-    `&nonce=${nonce}` +
     `&prompt=login`
   );
 }

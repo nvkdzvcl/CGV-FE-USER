@@ -26,9 +26,14 @@ import {
   Sparkles,
   ShieldCheck,
   RotateCcw,
+  Ticket,
+  CreditCard,
+  ScanLine,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { ApiService } from '../services/api';
 import toast from '../services/toastService';
+import TicketDetailModal from '../components/TicketDetailModal';
 import '../styles/profile.css';
 
 // SVG Icons cho Social Login
@@ -55,6 +60,7 @@ function FacebookIcon() {
 const TABS = {
   INFO: 'info',
   MEMBERSHIP: 'membership',
+  BOOKINGS: 'bookings',
   SECURITY: 'security',
   SOCIAL: 'social',
 };
@@ -152,6 +158,79 @@ export default function ProfilePage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [pwdLoading, setPwdLoading] = useState(false);
+
+  // State Lịch sử vé đã đặt
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [selectedTicketModal, setSelectedTicketModal] = useState(null);
+  const [bookingFilterStatus, setBookingFilterStatus] = useState('CONFIRMED');
+
+  const fetchBookings = async () => {
+    setBookingsLoading(true);
+    try {
+      const res = await ApiService.getMyBookings(0, 30);
+      const list = Array.isArray(res) ? res : (res?.data || []);
+
+      // Tự động làm giàu thông tin suất chiếu từ catalog nếu các trường đang rỗng
+      const enrichedList = await Promise.all(
+        list.map(async (b) => {
+          let enriched = { ...b };
+          if (b.showtimeId && (!b.movieTitle || !b.showtimeStart || !b.cinemaName)) {
+            try {
+              const sRes = await ApiService.getShowtimeById(b.showtimeId);
+              const s = sRes?.data || sRes;
+              if (s) {
+                enriched.movieTitle = enriched.movieTitle || s.movieTitle || s.movie?.title;
+                enriched.cinemaName = enriched.cinemaName || s.roomResponse?.cinemaResponse?.name;
+                enriched.cinemaAddress = enriched.cinemaAddress || s.roomResponse?.cinemaResponse?.address;
+                enriched.roomName = enriched.roomName || s.roomResponse?.name;
+                enriched.showtimeStart = enriched.showtimeStart || s.startTime;
+              }
+            } catch (err) {
+              console.warn('Lỗi làm giàu showtime cho booking:', b.bookingId, err);
+            }
+          }
+          return enriched;
+        })
+      );
+
+      setBookings(enrichedList);
+    } catch (err) {
+      console.warn('Could not load user bookings:', err.message);
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === TABS.BOOKINGS) {
+      fetchBookings();
+    }
+  }, [activeTab]);
+
+  const handlePayPendingBooking = async (booking) => {
+    try {
+      const paymentUrl = await ApiService.createVnpayPaymentUrl(booking.bookingId, booking.finalAmount);
+      if (paymentUrl && paymentUrl.startsWith('http')) {
+        window.location.href = paymentUrl;
+      } else {
+        toast.warning('Không thể tạo liên kết thanh toán lúc này.');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Lỗi tạo liên kết thanh toán VNPAY');
+    }
+  };
+
+  const handleCancelPendingBooking = async (bookingId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn đặt vé này và trả lại ghế?')) return;
+    try {
+      await ApiService.cancelBooking(bookingId);
+      toast.success('Đã hủy đơn đặt vé thành công!');
+      fetchBookings();
+    } catch (err) {
+      toast.error(err.message || 'Không thể hủy đơn đặt vé.');
+    }
+  };
 
   // Khi currentUser thay đổi từ auth context (đăng nhập/đăng xuất)
   useEffect(() => {
@@ -440,6 +519,14 @@ export default function ProfilePage() {
           </button>
           <button
             type="button"
+            className={`profile-nav-btn ${activeTab === TABS.BOOKINGS ? 'active' : ''}`}
+            onClick={() => handleTabChange(TABS.BOOKINGS)}
+          >
+            <Ticket size={18} />
+            Vé của tôi (Lịch sử)
+          </button>
+          <button
+            type="button"
             className={`profile-nav-btn ${activeTab === TABS.SECURITY ? 'active' : ''}`}
             onClick={() => handleTabChange(TABS.SECURITY)}
           >
@@ -679,6 +766,249 @@ export default function ProfilePage() {
             </div>
           )}
 
+          {/* ──────── TAB 2.5: VÉ CỦA TÔI (LỊCH SỬ ĐẶT VÉ) ──────── */}
+          {activeTab === TABS.BOOKINGS && (
+            <div>
+              <div className="profile-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3>
+                    <Ticket size={22} className="text-primary" /> Lịch sử đặt vé & Vé của tôi
+                  </h3>
+                  <p>Quản lý các vé xem phim đã đặt, tiếp tục thanh toán hoặc hủy vé chờ</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={fetchBookings}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', fontSize: '0.85rem' }}
+                >
+                  <RotateCcw size={15} /> Làm mới
+                </button>
+              </div>
+
+              {/* Filter Tabs: Mặc định chỉ hiển thị vé đã thanh toán */}
+              <div style={{ display: 'flex', gap: 10, margin: '14px 0 18px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setBookingFilterStatus('CONFIRMED')}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: 20,
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: bookingFilterStatus === 'CONFIRMED' ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                    color: bookingFilterStatus === 'CONFIRMED' ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  🎟️ Vé đã thanh toán ({bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'SUCCESS').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBookingFilterStatus('ALL')}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: 20,
+                    fontSize: '0.85rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: bookingFilterStatus === 'ALL' ? 'var(--primary)' : 'rgba(255,255,255,0.06)',
+                    color: bookingFilterStatus === 'ALL' ? '#fff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  📜 Tất cả lịch sử ({bookings.length})
+                </button>
+              </div>
+
+              {(() => {
+                const displayedBookings = bookingFilterStatus === 'CONFIRMED'
+                  ? bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'SUCCESS')
+                  : bookings;
+
+                if (bookingsLoading) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-secondary)' }}>
+                      <RotateCcw size={32} className="spin-animate" style={{ margin: '0 auto 12px' }} />
+                      <p>Đang tải danh sách vé của bạn...</p>
+                    </div>
+                  );
+                }
+
+                if (displayedBookings.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', border: '1px dashed var(--border-subtle)', borderRadius: 14 }}>
+                      <Ticket size={48} style={{ color: 'var(--text-muted)', margin: '0 auto 14px' }} />
+                      <h4 style={{ color: '#fff', marginBottom: 8 }}>
+                        {bookingFilterStatus === 'CONFIRMED' ? 'Bạn chưa có vé đã thanh toán nào' : 'Chưa có lịch sử giao dịch'}
+                      </h4>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: 20 }}>
+                        Hãy khám phá ngay các tựa phim bom tấn đang chiếu tại CGV và trải nghiệm điện ảnh đỉnh cao!
+                      </p>
+                      <a href="/movies" className="btn-primary" style={{ display: 'inline-flex', padding: '10px 22px', fontSize: '0.88rem' }}>
+                        Khám phá phim ngay
+                      </a>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {displayedBookings.map(b => {
+                      const isPending = b.status === 'PAYMENT_PENDING';
+                      const isConfirmed = b.status === 'CONFIRMED' || b.status === 'SUCCESS';
+                      const isCancelled = b.status === 'CANCELLED';
+                      const isExpired = b.status === 'EXPIRED';
+
+                      const statusBg = isConfirmed
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : isPending
+                        ? 'rgba(245, 158, 11, 0.15)'
+                        : 'rgba(239, 68, 68, 0.15)';
+                      const statusColor = isConfirmed
+                        ? '#10b981'
+                        : isPending
+                        ? '#f59e0b'
+                        : '#ef4444';
+                      const statusText = isConfirmed
+                        ? '✓ ĐÃ THANH TOÁN'
+                        : isPending
+                        ? '⏳ CHỜ THANH TOÁN'
+                        : isCancelled
+                        ? '✕ ĐÃ HỦY'
+                        : '✕ HẾT HẠN';
+
+                      return (
+                        <div
+                          key={b.bookingId}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: `1px solid ${isPending ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-subtle)'}`,
+                            borderRadius: 12,
+                            padding: '18px 20px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 12
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: 8 }}>MÃ ĐƠN:</span>
+                              <strong style={{ color: 'var(--primary-hover)', fontFamily: 'monospace', fontSize: '0.95rem' }}>
+                                {b.bookingId}
+                              </strong>
+                            </div>
+                            <span
+                              style={{
+                                background: statusBg,
+                                color: statusColor,
+                                padding: '4px 10px',
+                                borderRadius: 6,
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                letterSpacing: '0.5px'
+                              }}
+                            >
+                              {statusText}
+                            </span>
+                          </div>
+
+                          {/* Thông tin phim & rạp */}
+                          {(b.movieTitle || b.cinemaName) && (
+                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 10 }}>
+                              {b.movieTitle && (
+                                <div style={{ fontWeight: 700, fontSize: '0.98rem', color: '#fff', marginBottom: 2 }}>
+                                  {b.movieTitle}
+                                </div>
+                              )}
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                {b.cinemaName || ''}
+                                {b.roomName ? ` • ${b.roomName}` : ''}
+                                {b.showtimeStart ? ` • ${new Date(b.showtimeStart).toLocaleString('vi-VN')}` : ''}
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, fontSize: '0.86rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 }}>
+                            <div>
+                              <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.78rem' }}>Số lượng ghế:</span>
+                              <strong style={{ color: '#fff', fontSize: '0.92rem' }}>
+                                {(b.seatLabels?.length || b.seatIds?.length || 0)} ghế
+                                {b.seatLabels && b.seatLabels.length > 0 && (
+                                  <span style={{ color: '#e71a0f', marginLeft: 6, fontWeight: 700 }}>
+                                    ({b.seatLabels.join(', ')})
+                                  </span>
+                                )}
+                              </strong>
+                            </div>
+                            <div>
+                              <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.78rem' }}>Tổng thanh toán:</span>
+                              <strong style={{ color: '#fff', fontSize: '1rem' }}>
+                                {(b.finalAmount || b.totalBaseAmount || 0).toLocaleString('vi-VN')} đ
+                              </strong>
+                            </div>
+                            {b.discountAmount > 0 && (
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.78rem' }}>Đã giảm:</span>
+                                <strong style={{ color: '#10b981' }}>
+                                  -{Number(b.discountAmount).toLocaleString('vi-VN')} đ
+                                </strong>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Actions: CHỈ VÉ ĐÃ THANH TOÁN MỚI CÓ MÃ VẠCH SOÁT VÉ */}
+                          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', alignItems: 'center', paddingTop: 8, borderTop: '1px dashed rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+                            {isConfirmed && (
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={() => setSelectedTicketModal(b)}
+                                style={{ padding: '8px 16px', fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: 7, fontWeight: 700 }}
+                              >
+                                <ScanLine size={16} /> Xem vé & Mã vạch soát vé
+                              </button>
+                            )}
+
+                            {isPending && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => handleCancelPendingBooking(b.bookingId)}
+                                  style={{ padding: '7px 14px', fontSize: '0.82rem', color: '#f87171' }}
+                                >
+                                  Hủy vé
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-primary"
+                                  onClick={() => handlePayPendingBooking(b)}
+                                  style={{ padding: '7px 18px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                                >
+                                  <CreditCard size={15} /> Thanh toán qua VNPAY
+                                </button>
+                              </>
+                            )}
+
+                            {isCancelled && (
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                Đã hủy • Ghế đã được nhả về hệ thống
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
           {/* ──────── TAB 3: BẢO MẬT & ĐỔI MẬT KHẨU ──────── */}
           {activeTab === TABS.SECURITY && (
             <div>
@@ -813,7 +1143,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div className="social-connect-actions">
                     <span className={`social-status-badge ${profile.connectedAccounts?.google ? 'connected' : 'unconnected'}`}>
                       {profile.connectedAccounts?.google ? 'Đã liên kết' : 'Chưa liên kết'}
                     </span>
@@ -843,7 +1173,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div className="social-connect-actions">
                     <span className={`social-status-badge ${profile.connectedAccounts?.facebook ? 'connected' : 'unconnected'}`}>
                       {profile.connectedAccounts?.facebook ? 'Đã liên kết' : 'Chưa liên kết'}
                     </span>
@@ -865,6 +1195,14 @@ export default function ProfilePage() {
           )}
         </main>
       </div>
+
+      {/* Ticket Detail Modal with Barcode & Print Receipt */}
+      {selectedTicketModal && (
+        <TicketDetailModal
+          booking={selectedTicketModal}
+          onClose={() => setSelectedTicketModal(null)}
+        />
+      )}
     </div>
   );
 }

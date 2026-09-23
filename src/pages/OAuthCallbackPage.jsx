@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import {
   parseOAuthFragment,
+  exchangeCodeForTokens,
   decodeJwtPayload,
   socialSync,
   removeVietnameseDiacritics,
@@ -47,47 +48,83 @@ export default function OAuthCallbackPage() {
   }, []);
 
   async function handleCallback() {
-    // Parse fragment từ URL (#access_token=...&id_token=...&expires_in=...)
-    const { accessToken, idToken, refreshToken, expiresIn, error, errorDescription } =
-      parseOAuthFragment(window.location.hash);
+    // 1. Kiểm tra Authorization Code trong query params (?code=...&error=...)
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get('code');
+    const queryError = searchParams.get('error');
+    const queryErrorDesc = searchParams.get('error_description');
 
-    // Xử lý lỗi từ Keycloak
-    if (error) {
-      const msg = errorDescription
-        ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
-        : 'Đăng nhập xã hội thất bại.';
+    if (queryError) {
+      const msg = queryErrorDesc
+        ? decodeURIComponent(queryErrorDesc.replace(/\+/g, ' '))
+        : 'Đăng nhập mạng xã hội thất bại.';
       setErrorMessage(msg);
       setStatus(STATUS.ERROR);
       toast.error(msg);
       return;
     }
 
-    if (!accessToken) {
+    let tokens = null;
+
+    if (code) {
+      try {
+        tokens = await exchangeCodeForTokens(code);
+      } catch (exErr) {
+        console.error('Exchange code error:', exErr);
+        setErrorMessage('Không thể xác thực mã đăng nhập từ Google. Vui lòng thử lại: ' + exErr.message);
+        setStatus(STATUS.ERROR);
+        toast.error(exErr.message);
+        return;
+      }
+    } else {
+      // Fallback: Parse fragment từ URL (#access_token=...&id_token=...&expires_in=...)
+      const frag = parseOAuthFragment(window.location.hash);
+      if (frag.error) {
+        const msg = frag.errorDescription
+          ? decodeURIComponent(frag.errorDescription.replace(/\+/g, ' '))
+          : 'Đăng nhập xã hội thất bại.';
+        setErrorMessage(msg);
+        setStatus(STATUS.ERROR);
+        toast.error(msg);
+        return;
+      }
+
+      if (frag.accessToken) {
+        tokens = {
+          accessToken: frag.accessToken,
+          idToken: frag.idToken || null,
+          refreshToken: frag.refreshToken || null,
+          expiresIn: frag.expiresIn || 300,
+        };
+      }
+    }
+
+    if (!tokens || !tokens.accessToken) {
       setErrorMessage('Không nhận được token từ nhà cung cấp. Vui lòng thử lại.');
       setStatus(STATUS.ERROR);
       return;
     }
 
     try {
-      // Xóa fragment khỏi URL (bảo mật - không để token lộ trong history)
+      // Xóa query param / fragment khỏi URL (bảo mật - không để code/token lộ trong history)
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      // Gọi social-sync để tạo/lấy user trong DB local (không dùng tên từ Google/FB)
-      const userData = await socialSync(accessToken);
+      const accessToken = tokens.accessToken;
 
       // Decode JWT để lấy thông tin claim cơ bản
       const claims = decodeJwtPayload(accessToken);
 
-      const tokens = {
-        accessToken,
-        idToken: idToken || null,
-        refreshToken: refreshToken || null,
-        expiresIn: expiresIn || null,
-      };
+      // Gọi social-sync để tạo/lấy user trong DB local
+      let userData = null;
+      try {
+        userData = await socialSync(accessToken);
+      } catch (syncErr) {
+        console.warn('socialSync warning:', syncErr.message);
+      }
 
-      const savedFullName = userData?.fullName || '';
+      const savedFullName = userData?.fullName || claims?.name || '';
 
-      // Lưu tokens + tạo user object từ DB / JWT
+      // Lưu tokens (gồm cả accessToken và refreshToken) + tạo user object
       loginWithTokens(tokens, {
         id: userData?.id || claims.sub,
         email: userData?.email || claims.email || '',

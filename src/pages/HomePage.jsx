@@ -17,20 +17,43 @@ import TrailerModal from "../components/TrailerModal";
 import QuickBooking from "../components/QuickBooking";
 import MovieCard from "../components/MovieCard";
 import { MOVIES, CINEMAS } from "../data/mockData";
+import { ApiService } from "../services/api";
 
 export default function HomePage({ onOpenBooking }) {
+  const [allMovies, setAllMovies] = useState(MOVIES);
   const [heroIdx, setHeroIdx] = useState(0);
   const [heroTrailerOpen, setHeroTrailerOpen] = useState(false);
-  const heroMovies = MOVIES.filter((m) => m.backdropUrl);
-  const currentHero = heroMovies[heroIdx] || MOVIES[0];
 
-  const nowShowing = MOVIES.filter((m) => m.showingStatus === "NOW_SHOWING");
-  const comingSoon = MOVIES.filter((m) => m.showingStatus === "COMING_SOON");
-  const topMovies = nowShowing.slice(0, 5);
+  useEffect(() => {
+    ApiService.getMovies()
+      .then(res => {
+        if (Array.isArray(res) && res.length > 0) {
+          setAllMovies(res);
+        }
+      })
+      .catch(err => console.warn('Could not load real movies from API:', err.message));
+  }, []);
+
+  const nowShowing = allMovies.filter((m) => m.showingStatus === "NOW_SHOWING");
+  const comingSoon = allMovies.filter((m) => m.showingStatus === "COMING_SOON");
+
+  // Phim nổi bật (isFeatured) do Admin cấu hình
+  const featuredMovies = allMovies.filter((m) => m.isFeatured === true);
+
+  // Hero banner ưu tiên phim nổi bật
+  const heroCandidates = featuredMovies.length > 0 ? featuredMovies : allMovies;
+  const heroMovies = heroCandidates.filter((m) => m.backdropUrl || m.posterUrl);
+  const currentHero = heroMovies[heroIdx] || allMovies[0] || {};
+
+  // Bảng xếp hạng phim xem nhiều: Ưu tiên hiển thị phim có isFeatured = true
+  const topMovies = featuredMovies.length > 0
+    ? [...featuredMovies, ...nowShowing.filter(m => !m.isFeatured)].slice(0, 5)
+    : nowShowing.slice(0, 5);
 
   const autoPlayRef = useRef(null);
 
   useEffect(() => {
+    if (heroMovies.length === 0) return;
     autoPlayRef.current = setInterval(() => {
       setHeroIdx((prev) => (prev + 1) % heroMovies.length);
     }, 5000);
@@ -41,19 +64,18 @@ export default function HomePage({ onOpenBooking }) {
   }, [heroMovies.length]);
 
   const handlePrevSlide = () => {
+    if (heroMovies.length === 0) return;
     setHeroIdx((prev) => (prev - 1 + heroMovies.length) % heroMovies.length);
   };
 
   const handleNextSlide = () => {
+    if (heroMovies.length === 0) return;
     setHeroIdx((prev) => (prev + 1) % heroMovies.length);
   };
 
   const handleHeroBook = () => {
     onOpenBooking({
-      movie: currentHero,
-      cinema: CINEMAS[0],
-      date: "Hôm nay",
-      timeSlot: "19:30"
+      movie: currentHero
     });
   };
 
@@ -90,7 +112,7 @@ export default function HomePage({ onOpenBooking }) {
 
           <div className="hero-meta">
             <span className="badge-outline">Khởi chiếu: {currentHero.releaseDate}</span>
-            <span className="badge-outline">{currentHero.duration} phút</span>
+            <span className="badge-outline">{currentHero.durationMinutes || currentHero.duration || 120} phút</span>
             {currentHero.genre?.map((g, i) => (
               <span key={i} className="badge-outline">
                 {g}
@@ -99,18 +121,18 @@ export default function HomePage({ onOpenBooking }) {
           </div>
 
           <div className="hero-actions">
-            <button className="btn-primary" onClick={handleHeroBook}>
+            <button className="btn-primary btn-hero-book" onClick={handleHeroBook}>
               <Ticket size={16} />
               Đặt vé ngay
             </button>
-            <Link to={`/movies/${currentHero.id}`} className="btn-secondary" style={{ textDecoration: "none" }}>
+            <Link to={`/movies/${currentHero.id}`} className="btn-secondary btn-hero-detail" style={{ textDecoration: "none" }}>
               <Info size={16} />
               Chi tiết phim
             </Link>
             {currentHero.trailerYoutubeUrl && (
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-secondary btn-hero-trailer"
                 onClick={() => setHeroTrailerOpen(true)}
               >
                 <Play size={16} fill="#fff" />
@@ -160,27 +182,20 @@ export default function HomePage({ onOpenBooking }) {
             <MovieCard
               key={movie.id}
               movie={movie}
-              onBookTicket={(m) =>
-                onOpenBooking({
-                  movie: m,
-                  cinema: CINEMAS[0],
-                  date: "Hôm nay",
-                  timeSlot: "19:30"
-                })
-              }
+              onBookTicket={(m) => onOpenBooking({ movie: m })}
             />
           ))}
         </div>
       </section>
 
-      {/* Section 2: Bảng xếp hạng Top phim thịnh hành (Full Width Showcase) */}
+      {/* Section 2: Phim nổi bật (Full Width Showcase) */}
       <section className="leaderboard-section">
         <div className="leaderboard-header">
           <div className="section-title">
-            <Trophy className="section-title-icon" size={24} />
-            <span>Bảng xếp hạng phim xem nhiều</span>
+            <Sparkles className="section-title-icon" size={24} color="#f59e0b" />
+            <span>Phim nổi bật</span>
           </div>
-          <span className="leaderboard-subtitle">Top 5 phim ăn khách nhất tuần</span>
+          <span className="leaderboard-subtitle">Được tuyển chọn & xem nhiều nhất</span>
         </div>
 
         <div className="leaderboard-grid">
@@ -211,23 +226,35 @@ export default function HomePage({ onOpenBooking }) {
 
                 <div className="leaderboard-meta">
                   <Clock size={12} />
-                  <span>{m.duration} phút</span>
-                  <span>•</span>
-                  <span>{m.genre?.[0] || "Điện ảnh"}</span>
+                  <span>{m.durationMinutes || m.duration || 120} phút</span>
+                  {m.language && (
+                    <>
+                      <span>•</span>
+                      <span>{m.language}</span>
+                    </>
+                  )}
                 </div>
+
+                {m.supportedModes && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', margin: '4px 0 8px 0' }}>
+                    {m.supportedModes.includes('DUBBED') && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                        Lồng tiếng
+                      </span>
+                    )}
+                    {m.supportedModes.includes('SUBTITLED') && (
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                        Phụ đề
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 <button
                   type="button"
                   className="btn-book-ticket"
                   style={{ padding: "8px 12px", fontSize: "0.82rem", marginTop: "auto" }}
-                  onClick={() =>
-                    onOpenBooking({
-                      movie: m,
-                      cinema: CINEMAS[0],
-                      date: "Hôm nay",
-                      timeSlot: "19:30"
-                    })
-                  }
+                  onClick={() => onOpenBooking({ movie: m })}
                 >
                   Đặt vé
                 </button>
@@ -254,14 +281,7 @@ export default function HomePage({ onOpenBooking }) {
             <MovieCard
               key={movie.id}
               movie={movie}
-              onBookTicket={(m) =>
-                onOpenBooking({
-                  movie: m,
-                  cinema: CINEMAS[0],
-                  date: "Hôm nay",
-                  timeSlot: "19:30"
-                })
-              }
+              onBookTicket={(m) => onOpenBooking({ movie: m })}
             />
           ))}
         </div>

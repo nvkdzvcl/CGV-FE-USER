@@ -1,0 +1,774 @@
+/* ═══════════════════════════════════════════════════════════════════
+   MOVIE SCHEDULE MODAL — CGV CINEMA STYLE
+   ═══════════════════════════════════════════════════════════════════ */
+
+.schedule-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 15, 0.85);
+  backdrop-filter: blur(12px);
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.schedule-modal-container {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  overflow: hidden;
+  overflow-x: hidden;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.9), var(--shadow-glow);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   1. HERO BANNER & HEADER
+   ───────────────────────────────────────────── */
+.schedule-modal-hero {
+  position: relative;
+  padding: 24px 32px;
+  background: linear-gradient(180deg, rgba(15, 20, 34, 0.95) 0%, rgba(18, 24, 38, 0.98) 100%);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.schedule-movie-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.schedule-movie-poster {
+  width: 64px;
+  height: 92px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.schedule-movie-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-movie-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.schedule-movie-meta h3 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  letter-spacing: -0.02em;
+  word-break: break-word;
+}
+
+.schedule-movie-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.schedule-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.schedule-close-btn:hover {
+  background: rgba(255, 43, 84, 0.2);
+  border-color: var(--primary);
+  color: #fff;
+  transform: rotate(90deg);
+}
+
+/* ─────────────────────────────────────────────
+   2. BODY SCROLL AREA
+   ───────────────────────────────────────────── */
+.schedule-modal-body {
+  padding: 24px 32px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ─────────────────────────────────────────────
+   3. DATE RIBBON (CGV STYLE)
+   ───────────────────────────────────────────── */
+.schedule-date-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.schedule-section-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.schedule-date-ribbon {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+}
+
+.schedule-date-ribbon::-webkit-scrollbar {
+  height: 4px;
+}
+
+.schedule-date-ribbon::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.schedule-date-card {
+  min-width: 68px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.schedule-date-card:hover {
+  background: var(--bg-surface-hover);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.schedule-date-card.active {
+  background: var(--primary-gradient);
+  border-color: var(--primary-hover);
+  box-shadow: 0 6px 18px var(--primary-glow);
+  transform: translateY(-2px);
+}
+
+.schedule-date-card .date-day-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.schedule-date-card.active .date-day-name {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.schedule-date-card .date-day-num {
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.schedule-date-card .date-month {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.schedule-date-card.active .date-month {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* ─────────────────────────────────────────────
+   4. FILTERS: REGION, NEAR ME & FORMAT
+   ───────────────────────────────────────────── */
+.schedule-filter-bar {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.schedule-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.schedule-region-pills {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-near-me {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: rgba(231, 26, 15, 0.12);
+  border: 1px solid rgba(231, 26, 15, 0.4);
+  color: var(--primary-hover);
+}
+
+.btn-near-me:hover {
+  background: rgba(231, 26, 15, 0.22);
+  border-color: var(--primary);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-near-me.active {
+  background: var(--primary-gradient);
+  border-color: var(--primary-hover);
+  color: #fff;
+  box-shadow: 0 4px 14px var(--primary-glow);
+}
+
+.schedule-pill {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.schedule-pill:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+.schedule-pill.active {
+  background: rgba(231, 26, 15, 0.15);
+  border-color: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(231, 26, 15, 0.25);
+}
+
+.schedule-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.schedule-format-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.format-pill {
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.format-pill:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.format-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+
+.format-pill.mode-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+
+/* ─────────────────────────────────────────────
+   5. CINEMA & SHOWTIME CARDS
+   ───────────────────────────────────────────── */
+.schedule-cinema-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.schedule-cinema-card {
+  background: #121520;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  transition: all var(--transition-fast);
+}
+
+.schedule-cinema-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.schedule-cinema-header {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.schedule-cinema-info-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.schedule-cinema-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.schedule-cinema-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.distance-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 4px 12px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ĐỊA CHỈ: Tinh tế, rõ ràng, không viền đỏ thô cứng */
+.schedule-cinema-address-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.address-pin-icon {
+  color: #e71a0f;
+  flex-shrink: 0;
+}
+
+.address-text {
+  color: #cbd5e1;
+  font-weight: 400;
+}
+
+/* Slots Grid */
+.schedule-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 14px;
+}
+
+.schedule-slot-btn {
+  background: #171b26;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 12px 10px;
+  color: #fff;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.schedule-slot-btn:hover {
+  background: rgba(231, 26, 15, 0.16);
+  border-color: #e71a0f;
+  box-shadow: 0 8px 25px rgba(231, 26, 15, 0.35);
+  transform: translateY(-3px);
+}
+
+.schedule-slot-btn:hover .schedule-slot-time {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+.schedule-slot-btn:hover .schedule-slot-seats {
+  color: #cbd5e1;
+}
+
+.schedule-slot-btn:hover .slot-format-badge.format-4dx {
+  background: rgba(231, 26, 15, 0.35);
+  color: #ffffff;
+  border-color: #ff4d5a;
+}
+
+.schedule-slot-btn:hover .slot-sub-badge {
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+.schedule-slot-time {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.schedule-slot-tags {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.slot-format-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+/* Specific Format Badges */
+.slot-format-badge.format-2d {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.slot-format-badge.format-3d {
+  background: rgba(6, 182, 212, 0.18);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.35);
+}
+
+.slot-format-badge.format-imax {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.slot-format-badge.format-4dx {
+  background: rgba(231, 26, 15, 0.22);
+  color: #ff4d5a;
+  border: 1px solid rgba(231, 26, 15, 0.5);
+  box-shadow: 0 0 8px rgba(231, 26, 15, 0.3);
+}
+
+.slot-format-badge.format-screenx {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.slot-sub-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.slot-sub-badge.mode-sub {
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.slot-sub-badge.mode-dubbed {
+  background: rgba(139, 92, 246, 0.16);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.schedule-slot-seats {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.seat-avail-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+/* Empty & Loading */
+.schedule-empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.schedule-empty-state h4 {
+  color: #fff;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* ─────────────────────────────────────────────
+   6. RESPONSIVE BREAKPOINTS (TABLET & MOBILE)
+   ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .schedule-modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+    overflow: hidden;
+  }
+
+  .schedule-modal-container {
+    width: 100%;
+    max-width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    overflow: hidden;
+    overflow-x: hidden;
+  }
+
+  .schedule-modal-hero {
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .schedule-movie-poster {
+    width: 48px;
+    height: 68px;
+  }
+
+  .schedule-movie-meta h3 {
+    font-size: 1.1rem;
+  }
+
+  .schedule-movie-tags {
+    font-size: 0.72rem;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+  }
+
+  .schedule-modal-body {
+    padding: 14px 16px 36px;
+    gap: 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .schedule-date-ribbon {
+    gap: 8px;
+  }
+
+  .schedule-date-card {
+    min-width: 60px;
+    padding: 8px 6px;
+  }
+
+  .schedule-date-card .date-day-num {
+    font-size: 1.2rem;
+  }
+
+  .schedule-filter-bar {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .schedule-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .schedule-region-pills {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .schedule-filter-options {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .schedule-format-pills {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .format-pill,
+  .schedule-pill,
+  .btn-near-me {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .schedule-cinema-card {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .schedule-cinema-name {
+    font-size: 1.05rem;
+  }
+
+  .schedule-cinema-address-line {
+    font-size: 0.8rem;
+  }
+
+  .schedule-slots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+    gap: 10px;
+  }
+
+  .schedule-slot-btn {
+    padding: 10px 6px;
+    gap: 4px;
+  }
+
+  .schedule-slot-time {
+    font-size: 1.18rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .schedule-modal-hero {
+    padding: 10px 14px;
+  }
+
+  .schedule-movie-poster {
+    width: 42px;
+    height: 60px;
+  }
+
+  .schedule-movie-meta h3 {
+    font-size: 0.98rem;
+  }
+
+  .schedule-modal-body {
+    padding: 10px 12px 28px;
+    gap: 12px;
+  }
+
+  .schedule-date-card {
+    min-width: 54px;
+    padding: 6px 4px;
+  }
+
+  .schedule-date-card .date-day-num {
+    font-size: 1.1rem;
+  }
+
+  .schedule-cinema-card {
+    padding: 12px 14px;
+  }
+
+  .schedule-slots-grid {
+    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    gap: 8px;
+  }
+}

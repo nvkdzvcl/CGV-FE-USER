@@ -11,6 +11,20 @@ const AGE_CONFIG = {
   K: { label: "K", className: "age-k", name: "Dưới 13 tuổi có người lớn kèm" },
 };
 
+const formatVnDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return dateStr;
+  }
+};
+
 export default function MovieCard({ movie, onBookTicket }) {
   const navigate = useNavigate();
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
@@ -29,7 +43,32 @@ export default function MovieCard({ movie, onBookTicket }) {
     }
   };
 
-  const genreText = movie.genre?.slice(0, 2).join(", ") || "Điện ảnh";
+  const getMovieModes = (m) => {
+    if (m?.supportedModes) {
+      const modes = [];
+      const supp = String(m.supportedModes).toUpperCase();
+      if (supp.includes('SUBTITLED') || supp.includes('PHU_DE')) modes.push('Phụ đề');
+      if (supp.includes('DUBBED') || supp.includes('LONG_TIENG')) modes.push('Lồng tiếng');
+      if (supp.includes('VOICEOVER') || supp.includes('THUYET_MINH')) modes.push('Thuyết minh');
+      if (modes.length > 0) return modes;
+    }
+    const modes = [];
+    const sub = (m?.subtitle || '').toLowerCase();
+    const lang = (m?.language || '').toLowerCase();
+    if (sub.includes('phụ đề') || sub.includes('tiếng việt') || lang.includes('anh') || lang.includes('hàn') || lang.includes('nhật')) {
+      modes.push('Phụ đề');
+    }
+    if (lang.includes('lồng tiếng') || sub.includes('lồng tiếng')) {
+      modes.push('Lồng tiếng');
+    }
+    return modes.length > 0 ? modes : ['Phụ đề'];
+  };
+
+  const movieModes = getMovieModes(movie);
+
+  const genreText = Array.isArray(movie?.genre)
+    ? movie.genre.slice(0, 2).join(", ")
+    : (typeof movie?.genre === "string" ? movie.genre : (movie?.genres || "Hành động"));
 
   return (
     <>
@@ -52,18 +91,40 @@ export default function MovieCard({ movie, onBookTicket }) {
             </div>
           </Link>
 
-          {/* Badges Overlay on Poster: Left is Status, Right is Age Rating */}
+          {/* Badges Overlay on Poster: Left is Status (always) + Featured (beside it), Right is Age Rating */}
           <div className="movie-poster-badges">
-            <span className={`movie-status-pill ${isNowShowing ? "status-now-showing" : "status-coming-soon"}`}>
-              {isNowShowing ? (
-                <>
-                  <span className="status-live-dot" />
-                  Đang chiếu
-                </>
-              ) : (
-                movie.releaseDate ? `Khởi chiếu ${movie.releaseDate}` : "Sắp chiếu"
+            <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+              <span className={`movie-status-pill ${isNowShowing ? "status-now-showing" : "status-coming-soon"}`}>
+                {isNowShowing ? (
+                  <>
+                    <span className="status-live-dot" />
+                    Đang chiếu
+                  </>
+                ) : (
+                  "Sắp chiếu"
+                )}
+              </span>
+              {movie.isFeatured && (
+                <span
+                  style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    color: '#fff',
+                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    padding: '2px 7px',
+                    borderRadius: 10,
+                    boxShadow: '0 2px 6px rgba(245, 158, 11, 0.4)',
+                    letterSpacing: '0.02em',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3
+                  }}
+                  title="Phim nổi bật CGV"
+                >
+                  ⭐ Nổi bật
+                </span>
               )}
-            </span>
+            </div>
 
             {movie.ageRating && (
               <span
@@ -88,12 +149,22 @@ export default function MovieCard({ movie, onBookTicket }) {
             <span className="movie-meta-genre">{genreText}</span>
             <span className="meta-dot">•</span>
             <span className="movie-meta-duration">
-              <Clock size={12} /> {movie.duration} phút
+              <Clock size={12} /> {movie.durationMinutes || movie.duration || 120} phút
             </span>
           </div>
 
+          {!isNowShowing && movie.releaseDate && (
+            <div className="movie-release-banner">
+              Khởi chiếu: <strong>{formatVnDate(movie.releaseDate)}</strong>
+            </div>
+          )}
+
           <div className="movie-sub-badges">
-            <span className="movie-format-pill">2D Phụ đề</span>
+            {movieModes.map((mode, idx) => (
+              <span key={idx} className={`movie-format-pill ${mode === 'Lồng tiếng' ? 'dubbed' : ''}`}>
+                {mode}
+              </span>
+            ))}
             {movie.country && <span className="movie-country-text">{movie.country}</span>}
           </div>
 
@@ -116,14 +187,27 @@ export default function MovieCard({ movie, onBookTicket }) {
               </Link>
             </div>
           ) : (
-            <Link
-              to={`/movies/${movie.id}`}
-              className="btn-book-ticket btn-coming-soon"
-              style={{ textDecoration: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
-            >
-              <Play size={14} fill="#fff" />
-              Xem chi tiết & Trailer
-            </Link>
+            <div className="movie-card-actions-row">
+              <button
+                type="button"
+                className="btn-card-trailer"
+                onClick={handleOpenTrailer}
+                title="Xem nhanh Trailer"
+                style={{ flex: 1 }}
+              >
+                <Play size={13} fill="currentColor" />
+                Trailer
+              </button>
+              <Link
+                to={`/movies/${movie.id}`}
+                className="btn-card-detail"
+                title="Xem chi tiết phim"
+                style={{ flex: 1 }}
+              >
+                <Info size={14} style={{ marginRight: 4 }} />
+                Chi tiết
+              </Link>
+            </div>
           )}
         </div>
       </div>

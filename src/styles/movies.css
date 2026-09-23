@@ -173,12 +173,12 @@
     display: flex;
   }
 
-  .filter-sidebar {
+  .movies-page .filter-sidebar {
     display: none;
     margin-bottom: 24px;
   }
 
-  .filter-sidebar.mobile-open {
+  .movies-page .filter-sidebar.mobile-open {
     display: block;
     animation: fadeInSidebar 0.25s ease;
   }
