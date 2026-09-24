@@ -32,15 +32,23 @@ async function doFetch(path, options, token) {
   const userId = token ? (getTokens()?.user?.id || getSessionId()) : getSessionId();
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
-  return await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': userId,
-      ...authHeaders,
-      ...(options.headers || {})
-    },
-    ...options
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+  try {
+    return await fetch(`${API_BASE}${path}`, {
+      signal: options.signal || controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': userId,
+        ...authHeaders,
+        ...(options.headers || {})
+      },
+      ...options
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -148,6 +156,15 @@ export const ApiService = {
       {},
       MOVIES.find(m => m.id === id || m.id === Number(id)) || MOVIES[0]
     );
+  },
+
+  getMovieCasts: async (movieId) => {
+    const data = await request(
+      `/api/v1/catalogs/movie-casts/movie/${movieId}`,
+      {},
+      []
+    );
+    return Array.isArray(data) ? data : (data?.data || []);
   },
 
   searchMovies: async (keyword) => {
@@ -364,6 +381,10 @@ export const ApiService = {
 
   getActiveSeatLocks: async (showtimeId) => {
     return await request(`/api/v1/bookings/seat-locks/${showtimeId}`, {}, []);
+  },
+
+  getBookedSeats: async (showtimeId) => {
+    return await request(`/api/v1/bookings/seat-locks/booked/${showtimeId}`, {}, []);
   },
 
   lockSeats: async (showtimeId, seatIds) => {

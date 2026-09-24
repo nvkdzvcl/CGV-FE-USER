@@ -171,17 +171,63 @@ export default function MovieDetailPage({ onOpenBooking }) {
   const [selectedMode, setSelectedMode] = useState('ALL'); // 'ALL' | 'SUBTITLED' | 'DUBBED'
 
   const [movie, setMovie] = useState(() => MOVIES.find((m) => m.id === id || m.id === Number(id)) || null);
+  const [casts, setCasts] = useState([]);
   const [scheduleData, setScheduleData] = useState(null);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+  const [isLoadingMovie, setIsLoadingMovie] = useState(() => !MOVIES.some((m) => m.id === id || m.id === Number(id)));
 
-  // 1. Tải chi tiết phim từ Backend
+  // Lọc danh sách cụm rạp & suất chiếu theo Format & Viewing Mode
+  const filteredCinemas = useMemo(() => {
+    const list = scheduleData?.cinemas || [];
+    if (list.length === 0) return [];
+
+    return list.map(c => {
+      const validSlots = (c.showtimes || []).filter(st => {
+        // Lọc format
+        if (selectedFormat !== 'ALL') {
+          const fmt = normalizeFormat(st.format);
+          if (fmt !== selectedFormat) return false;
+        }
+        // Lọc viewing mode
+        if (selectedMode !== 'ALL') {
+          const modeLabel = getViewingModeLabel(st.viewingMode, st);
+          if (selectedMode === 'DUBBED' && modeLabel !== 'Lồng tiếng') return false;
+          if (selectedMode === 'SUBTITLED' && modeLabel !== 'Phụ đề') return false;
+        }
+        return true;
+      });
+
+      return { ...c, showtimes: validSlots };
+    }).filter(c => c.showtimes.length > 0);
+  }, [scheduleData, selectedFormat, selectedMode]);
+
+  const sortedCasts = useMemo(() => {
+    const list = (casts && casts.length > 0) ? casts : (movie?.casts || []);
+    return [...list].sort((a, b) => {
+      const roleWeight = (role) => (role === 'DIRECTOR' ? 0 : role === 'LEAD' ? 1 : 2);
+      const diff = roleWeight(a.roleType) - roleWeight(b.roleType);
+      if (diff !== 0) return diff;
+      return (a.displayOrder || 0) - (b.displayOrder || 0);
+    });
+  }, [casts, movie?.casts]);
+
+  // 1. Tải chi tiết phim (đã tích hợp đầy đủ danh sách diễn viên & đạo diễn trong 1 API duy nhất)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setIsLoadingMovie(true);
     ApiService.getMovieById(id)
       .then(res => {
-        if (res) setMovie(res);
+        if (res) {
+          setMovie(res);
+          if (res.casts && res.casts.length > 0) {
+            setCasts(res.casts);
+          }
+        }
       })
-      .catch(err => console.warn('Lỗi tải chi tiết phim từ backend:', err.message));
+      .catch(err => console.warn('Lỗi tải chi tiết phim từ backend:', err.message))
+      .finally(() => {
+        setIsLoadingMovie(false);
+      });
   }, [id]);
 
   // 2. Tải lịch chiếu thật của phim này từ Backend
@@ -204,6 +250,14 @@ export default function MovieDetailPage({ onOpenBooking }) {
 
     return () => { isMounted = false; };
   }, [movie?.id, selectedDateObj.dateStr]);
+
+  if (isLoadingMovie && !movie) {
+    return (
+      <div className="movie-detail-container" style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <CgvAuraLoader text="Đang đồng bộ dữ liệu phim..." />
+      </div>
+    );
+  }
 
   if (!movie) {
     return (
@@ -254,36 +308,9 @@ export default function MovieDetailPage({ onOpenBooking }) {
     }
   };
 
-  const sortedCasts = movie.casts ? [...movie.casts].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)) : [];
   const embedTrailerUrl = getYouTubeEmbedUrl(movie.trailerYoutubeUrl || movie.trailerUrl);
 
-  // Lọc danh sách cụm rạp & suất chiếu theo Format & Viewing Mode
-  const filteredCinemas = useMemo(() => {
-    const list = scheduleData?.cinemas || [];
-    if (list.length === 0) return [];
-
-    return list.map(c => {
-      const validSlots = (c.showtimes || []).filter(st => {
-        // Lọc format
-        if (selectedFormat !== 'ALL') {
-          const fmt = normalizeFormat(st.format);
-          if (fmt !== selectedFormat) return false;
-        }
-        // Lọc viewing mode
-        if (selectedMode !== 'ALL') {
-          const modeLabel = getViewingModeLabel(st.viewingMode, st);
-          if (selectedMode === 'DUBBED' && modeLabel !== 'Lồng tiếng') return false;
-          if (selectedMode === 'SUBTITLED' && modeLabel !== 'Phụ đề') return false;
-        }
-        return true;
-      });
-
-      return { ...c, showtimes: validSlots };
-    }).filter(c => c.showtimes.length > 0);
-  }, [scheduleData, selectedFormat, selectedMode]);
-
   const handleSlotClick = (cinema, slot) => {
-    if (!onOpenBooking) return;
     onOpenBooking({
       movie,
       cinema: {
@@ -315,29 +342,36 @@ export default function MovieDetailPage({ onOpenBooking }) {
       </div>
 
       {/* Hero Header Section */}
-      <div className="movie-detail-header">
-        <div className="movie-detail-backdrop-blur">
-          <img src={movie.backdropUrl || movie.posterUrl} alt="" className="backdrop-img" />
-          <div className="backdrop-gradient-overlay" />
-        </div>
+      <div
+        className="movie-detail-hero"
+        style={{
+          backgroundImage: `url(${movie.backdropUrl || movie.posterUrl})`
+        }}
+      >
+        <div className="movie-detail-hero-backdrop-overlay" />
 
-        <div className="movie-detail-header-content">
-          {/* Left Poster */}
-          <div className="movie-detail-poster-wrap">
-            <img src={movie.posterUrl} alt={movie.title} className="movie-detail-poster" />
+        <div className="movie-detail-hero-inner">
+          {/* Left Column: Poster & Quick Action */}
+          <div className="movie-detail-poster-card">
+            <img
+              src={movie.posterUrl}
+              alt={movie.title}
+              className="movie-detail-poster-img"
+              loading="eager"
+            />
             {embedTrailerUrl && (
               <button
                 type="button"
-                className="btn-trailer-circle-play"
+                className="movie-detail-poster-play-btn"
                 onClick={() => setIsTrailerOpen(true)}
-                title="Xem nhanh Trailer 1080p"
+                title="Xem nhanh Trailer HD"
               >
                 <Play size={28} fill="#fff" />
               </button>
             )}
           </div>
 
-          {/* Right Header Info */}
+          {/* Right Column: Header Info */}
           <div className="movie-detail-header-info">
             <div className="movie-detail-badges-row">
               <span className={`movie-status-pill ${isNowShowing ? "status-now-showing" : "status-coming-soon"}`}>
@@ -742,12 +776,16 @@ export default function MovieDetailPage({ onOpenBooking }) {
             <div className="movie-specs-list">
               <div className="spec-item">
                 <span className="spec-label">Đạo diễn</span>
-                <span className="spec-value">{movie.director || "Đang cập nhật"}</span>
+                <span className="spec-value">
+                  {sortedCasts.find(c => c.roleType === 'DIRECTOR')?.actorName || movie.director || "Đang cập nhật"}
+                </span>
               </div>
 
               <div className="spec-item">
                 <span className="spec-label">Diễn viên chính</span>
-                <span className="spec-value">{movie.cast || "Đang cập nhật"}</span>
+                <span className="spec-value">
+                  {sortedCasts.filter(c => c.roleType === 'LEAD').map(c => c.actorName).join(", ") || movie.cast || "Đang cập nhật"}
+                </span>
               </div>
 
               <div className="spec-item">
