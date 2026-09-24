@@ -225,99 +225,122 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   // 4. Resolve roomId & Load real seats from DB by roomId with API-driven prices
   useEffect(() => {
-    const currentRoomId = activeShowtime?.roomResponse?.id || activeShowtime?.roomId
-      || bookingContext?.showtime?.roomResponse?.id || bookingContext?.showtime?.roomId
-      || bookingContext?.roomId;
+    // Ưu tiên roomId trực tiếp từ bookingContext hoặc showtime
+    const currentRoomId = bookingContext?.roomId
+      || bookingContext?.showtime?.roomId
+      || activeShowtime?.roomId
+      || activeShowtime?.roomResponse?.id
+      || bookingContext?.showtime?.roomResponse?.id;
 
     if (!currentRoomId && showtimeId && showtimeId.length === 36) {
       ApiService.getShowtimeById(showtimeId)
         .then(st => {
           if (st) setActiveShowtime(st);
         })
-        .catch(err => console.warn('Không thể tải chi tiết showtime:', err));
+        .catch(err => {
+          console.warn('Không thể tải chi tiết showtime:', err);
+          setIsLoadingSeats(false);
+        });
       return;
     }
 
-    if (!currentRoomId) return;
+    if (!currentRoomId) {
+      setIsLoadingSeats(false);
+      return;
+    }
 
     let isMounted = true;
     setIsLoadingSeats(true);
 
-    ApiService.getSeatsByRoomId(currentRoomId)
-      .then(res => {
-        if (!isMounted) return;
-        const roomSeats = Array.isArray(res) ? res : (res?.data || []);
-        if (roomSeats.length === 0) return;
+    // Timeout an toàn 1.2s: tự động gỡ overlay loading nếu backend có độ trễ, cho phép người dùng tương tác ngay
+    const safetyTimer = setTimeout(() => {
+      if (isMounted) setIsLoadingSeats(false);
+    }, 1200);
 
-        // Trích xuất hàng và số cột chuẩn xác trực tiếp từ Database BE
-        const rowsFound = Array.from(new Set(roomSeats.map(s => s.rowChar).filter(Boolean))).sort();
-        const maxColFound = Math.max(...roomSeats.map(s => Number(s.seatNumber) || 0), 10);
-        if (rowsFound.length > 0) setGridRows(rowsFound);
-        if (maxColFound > 0) setSeatsPerRow(maxColFound);
+    Promise.allSettled([
+      ApiService.getSeatsByRoomId(currentRoomId),
+      showtimeId && showtimeId.length === 36 ? ApiService.getBookedSeats(showtimeId) : Promise.resolve([]),
+      showtimeId && showtimeId.length === 36 ? ApiService.getActiveSeatLocks(showtimeId) : Promise.resolve([])
+    ]).then(([seatsRes, bookedRes, locksRes]) => {
+      if (!isMounted) return;
 
-        const vipSurcharge = Number(seatTypeSurcharges.VIP ?? 15000);
-        const sweetboxSurcharge = Number(seatTypeSurcharges.SWEETBOX ?? 30000);
+      const roomSeats = seatsRes.status === 'fulfilled'
+        ? (Array.isArray(seatsRes.value) ? seatsRes.value : (seatsRes.value?.data || []))
+        : [];
 
-        setSeats(prev => {
-          const updated = {};
-          roomSeats.forEach(s => {
-            const row = s.rowChar;
-            const num = s.seatNumber;
-            const id = `${row}${num}`;
-            let type = 'normal';
-            let price = basePrice;
+      if (roomSeats.length === 0) {
+        setIsLoadingSeats(false);
+        return;
+      }
 
-            if (s.seatTypeName === 'VIP') {
-              type = 'vip';
-              price = basePrice + vipSurcharge;
-            } else if (s.seatTypeName === 'SWEETBOX') {
-              type = 'sweetbox';
-              price = basePrice * 2 + sweetboxSurcharge;
-            }
+      const rawBooked = bookedRes.status === 'fulfilled'
+        ? (Array.isArray(bookedRes.value) ? bookedRes.value : (bookedRes.value?.data || []))
+        : [];
+      const bookedSet = new Set(rawBooked.map(String));
 
-            const currentStatus = prev[id]?.status === 'holding' ? 'holding' : (s.isActive === false ? 'booked' : 'available');
+      const rawLocks = locksRes.status === 'fulfilled'
+        ? (Array.isArray(locksRes.value) ? locksRes.value : (locksRes.value?.data || []))
+        : [];
+      const locksSet = new Set(rawLocks.map(String));
 
-            updated[id] = {
-              id,
-              dbId: s.id,
-              row,
-              number: num,
-              type,
-              price,
-              status: currentStatus
-            };
-          });
-          return updated;
+      // Trích xuất hàng và số cột chuẩn xác trực tiếp từ Database BE
+      const rowsFound = Array.from(new Set(roomSeats.map(s => s.rowChar).filter(Boolean))).sort();
+      const maxColFound = Math.max(...roomSeats.map(s => Number(s.seatNumber) || 0), 10);
+      if (rowsFound.length > 0) setGridRows(rowsFound);
+      if (maxColFound > 0) setSeatsPerRow(maxColFound);
+
+      const vipSurcharge = Number(seatTypeSurcharges.VIP ?? 15000);
+      const sweetboxSurcharge = Number(seatTypeSurcharges.SWEETBOX ?? 30000);
+
+      setSeats(() => {
+        const updated = {};
+        roomSeats.forEach(s => {
+          const row = s.rowChar;
+          const num = s.seatNumber;
+          const id = `${row}${num}`;
+          let type = 'normal';
+          let price = basePrice;
+
+          if (s.seatTypeName === 'VIP') {
+            type = 'vip';
+            price = basePrice + vipSurcharge;
+          } else if (s.seatTypeName === 'SWEETBOX') {
+            type = 'sweetbox';
+            price = basePrice * 2 + sweetboxSurcharge;
+          }
+
+          let currentStatus = 'available';
+          const sIdStr = String(s.id);
+          if (bookedSet.has(sIdStr) || s.isActive === false) {
+            currentStatus = 'booked';
+          } else if (locksSet.has(sIdStr)) {
+            currentStatus = 'holding';
+          }
+
+          updated[id] = {
+            id,
+            dbId: s.id,
+            row,
+            number: num,
+            type,
+            price,
+            status: currentStatus
+          };
         });
-      })
-      .catch(err => console.error('Không thể tải sơ đồ ghế từ DB:', err))
-      .finally(() => {
-        if (isMounted) setIsLoadingSeats(false);
+        return updated;
       });
+    }).catch(err => {
+      console.error('Lỗi khi tải sơ đồ ghế:', err);
+    }).finally(() => {
+      clearTimeout(safetyTimer);
+      if (isMounted) setIsLoadingSeats(false);
+    });
 
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimer);
+    };
   }, [activeShowtime, bookingContext, basePrice, seatTypeSurcharges, showtimeId]);
-
-  // 5. Query already active seat locks from Redis
-  useEffect(() => {
-    if (!showtimeId || showtimeId.length < 20) return;
-    ApiService.getActiveSeatLocks(showtimeId)
-      .then(lockedIds => {
-        if (Array.isArray(lockedIds) && lockedIds.length > 0) {
-          setSeats(prevSeats => {
-            const updated = { ...prevSeats };
-            lockedIds.forEach(targetId => {
-              const seatKey = Object.keys(updated).find(k => updated[k]?.dbId === targetId || k === targetId);
-              if (seatKey && updated[seatKey]?.status === 'available') {
-                updated[seatKey] = { ...updated[seatKey], status: 'holding' };
-              }
-            });
-            return updated;
-          });
-        }
-      })
-      .catch(() => {});
-  }, [showtimeId]);
 
   const selectedSeatIdsRef = useRef(selectedSeatIds);
   const seatsRef = useRef(seats);
@@ -460,6 +483,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   // ─── Seat click handler ───
   const toggleSeat = async (id) => {
     // 1. Bắt buộc đăng nhập trước khi giữ ghế (chống spam từ người dùng ẩn danh)
+    if (isLoadingSeats) return;
     if (!currentUser) {
       alert('Vui lòng đăng nhập tài khoản trước khi chọn và giữ ghế!');
       if (onOpenAuth) onOpenAuth('login');
@@ -763,17 +787,33 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
             </div>
 
             {/* Seat Map - Always visible */}
-            <div className="seats-container">
+            <div className="seats-container" style={{ position: 'relative' }}>
               {isLoadingSeats && (
                 <div style={{
-                  fontSize: '0.78rem', color: '#60a5fa', marginBottom: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                  position: 'absolute',
+                  inset: 0,
+                  zIndex: 10,
+                  backgroundColor: 'rgba(15, 23, 42, 0.72)',
+                  backdropFilter: 'blur(3px)',
+                  borderRadius: 12,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  color: '#e2e8f0',
+                  minHeight: 220
                 }}>
-                  <div className="spin-animate" style={{ fontSize: '0.85rem' }}>⟳</div>
-                  <span>Đang đồng bộ trạng thái ghế từ phòng chiếu...</span>
+                  <div className="spin-animate" style={{ fontSize: '1.6rem', color: '#e11d48' }}>⟳</div>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 500, letterSpacing: '0.02em' }}>
+                    Đang đồng bộ sơ đồ phòng chiếu & kiểm tra ghế...
+                  </span>
                 </div>
               )}
-              <div className="seat-map-grid">
+              <div 
+                className="seat-map-grid"
+                style={isLoadingSeats ? { opacity: 0.25, pointerEvents: 'none', filter: 'grayscale(0.8)' } : { transition: 'opacity 0.25s ease, filter 0.25s ease' }}
+              >
                 {gridRows.map(row => {
                   const isSweetboxRow = row === 'H';
                   return (
