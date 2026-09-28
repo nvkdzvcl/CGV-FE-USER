@@ -24,7 +24,7 @@ export default function HomePage({ onOpenBooking }) {
   const [heroIdx, setHeroIdx] = useState(0);
   const [heroTrailerOpen, setHeroTrailerOpen] = useState(false);
 
-  useEffect(() => {
+  const loadMovies = () => {
     ApiService.getMovies()
       .then(res => {
         if (Array.isArray(res) && res.length > 0) {
@@ -32,6 +32,19 @@ export default function HomePage({ onOpenBooking }) {
         }
       })
       .catch(err => console.warn('Could not load real movies from API:', err.message));
+  };
+
+  useEffect(() => {
+    loadMovies();
+
+    const handleRealtimeUpdate = () => {
+      loadMovies();
+    };
+
+    window.addEventListener('cgv_realtime_movie_updated', handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener('cgv_realtime_movie_updated', handleRealtimeUpdate);
+    };
   }, []);
 
   const nowShowing = allMovies.filter((m) => m.showingStatus === "NOW_SHOWING");

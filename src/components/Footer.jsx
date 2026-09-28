@@ -48,10 +48,10 @@ export default function Footer() {
 
           <div className="footer-col">
             <h4>Dịch vụ Doanh nghiệp</h4>
-            <p>Thuê trọn phòng chiếu, tổ chức hội nghị, sự kiện ra mắt phim và bán vé số lượng lớn.</p>
-            <a href="mailto:corporate@cgv.vn" className="badge-tag" style={{ padding: '8px 16px' }}>
-              Liên hệ Thuê rạp sự kiện
-            </a>
+            <ul>
+              <li><a href="mailto:business@cgv.vn">✉️ business@cgv.vn</a></li>
+              <li><a href="tel:19006017">📞 1900 6017 (nhánh 2)</a></li>
+            </ul>
           </div>
         </div>
 

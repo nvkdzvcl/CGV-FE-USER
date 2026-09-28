@@ -66,13 +66,15 @@ export default function QuickBooking({ onSelectBooking }) {
   const dropdownRef = useRef(null);
 
   // Tải danh sách phim Đang Chiếu và toàn bộ Rạp trên toàn hệ thống
-  useEffect(() => {
+  const loadQuickData = () => {
     ApiService.getMovies('NOW_SHOWING').then(res => {
       const list = Array.isArray(res) ? res : (res?.data || []);
       if (list.length > 0) {
         setAllMovies(list);
-        setSelectedMovie(list[0]);
-        setSearchKeyword(list[0].title);
+        setSelectedMovie(prev => {
+          if (!prev) return list[0];
+          return list.find(m => m.id === prev.id) || list[0];
+        });
       }
     }).catch(err => console.warn('Lỗi tải danh sách phim ban đầu:', err));
 
@@ -84,6 +86,23 @@ export default function QuickBooking({ onSelectBooking }) {
       });
       setAllCinemasMap(map);
     }).catch(() => {});
+  };
+
+  useEffect(() => {
+    loadQuickData();
+
+    const handleUpdate = () => {
+      loadQuickData();
+    };
+
+    window.addEventListener('cgv_realtime_movie_updated', handleUpdate);
+    window.addEventListener('cgv_realtime_cinema_updated', handleUpdate);
+    window.addEventListener('cgv_realtime_showtime_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('cgv_realtime_movie_updated', handleUpdate);
+      window.removeEventListener('cgv_realtime_cinema_updated', handleUpdate);
+      window.removeEventListener('cgv_realtime_showtime_updated', handleUpdate);
+    };
   }, []);
 
   // Tìm kiếm mờ phim qua Elasticsearch (Fuzzy Search & Full-Text)

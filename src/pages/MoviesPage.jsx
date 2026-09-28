@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Film, Flame, RotateCcw, X, SlidersHorizontal } from 'lucide-react';
+import { Film, Flame, RotateCcw, X, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import MovieCard from '../components/MovieCard';
 import { MOVIES, CINEMAS } from '../data/mockData';
 import { ApiService } from '../services/api';
@@ -30,13 +30,28 @@ export default function MoviesPage({ onOpenBooking }) {
   const [selectedCountry, setSelectedCountry] = useState('ALL');
   const [selectedAge, setSelectedAge] = useState('ALL');
   const [sortBy, setSortBy] = useState('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
-  useEffect(() => {
+  const loadMovies = () => {
     ApiService.getMovies().then(res => {
       if (Array.isArray(res) && res.length > 0) {
         setMovieList(res);
       }
     }).catch(e => console.warn('Using fallback movies in MoviesPage:', e.message));
+  };
+
+  useEffect(() => {
+    loadMovies();
+
+    const handleRealtimeUpdate = () => {
+      loadMovies();
+    };
+
+    window.addEventListener('cgv_realtime_movie_updated', handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener('cgv_realtime_movie_updated', handleRealtimeUpdate);
+    };
   }, []);
 
   const toggleGenre = (genre) => {
@@ -84,6 +99,16 @@ export default function MoviesPage({ onOpenBooking }) {
       return 0; // default newest
     });
   }, [searchQ, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQ, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMovies.length / pageSize));
+  const paginatedMovies = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredMovies.slice(start, start + pageSize);
+  }, [filteredMovies, currentPage, pageSize]);
 
   return (
     <div className="movies-page">
@@ -302,20 +327,97 @@ export default function MoviesPage({ onOpenBooking }) {
               <p>Không tìm thấy phim phù hợp với bộ lọc hiện tại.</p>
             </div>
           ) : (
-            <div className="movies-grid-full">
-              {filteredMovies.map(movie => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
-                  onBookTicket={(m) => onOpenBooking({
-                    movie: m,
-                    cinema: CINEMAS[0],
-                    date: 'Hôm nay',
-                    timeSlot: '19:30'
-                  })}
-                />
-              ))}
-            </div>
+            <>
+              <div className="movies-grid-full">
+                {paginatedMovies.map(movie => (
+                  <MovieCard
+                    key={movie.id}
+                    movie={movie}
+                    onBookTicket={(m) => onOpenBooking({
+                      movie: m,
+                      cinema: CINEMAS[0],
+                      date: 'Hôm nay',
+                      timeSlot: '19:30'
+                    })}
+                  />
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: 32,
+                  padding: '16px 20px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 12,
+                  flexWrap: 'wrap',
+                  gap: 16
+                }}>
+                  <div style={{ fontSize: '0.88rem', color: '#94a3b8' }}>
+                    Hiển thị <strong style={{ color: '#fff' }}>{(currentPage - 1) * pageSize + 1}</strong> - <strong style={{ color: '#fff' }}>{Math.min(currentPage * pageSize, filteredMovies.length)}</strong> trên tổng số <strong style={{ color: '#fff' }}>{filteredMovies.length}</strong> phim
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={currentPage <= 1}
+                      onClick={() => {
+                        setCurrentPage(p => Math.max(1, p - 1));
+                        window.scrollTo({ top: 120, behavior: 'smooth' });
+                      }}
+                      style={{ padding: '7px 12px', fontSize: '0.85rem' }}
+                    >
+                      <ChevronLeft size={16} /> Trước
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setCurrentPage(p);
+                          window.scrollTo({ top: 120, behavior: 'smooth' });
+                        }}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          border: '1px solid',
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: currentPage === p ? 'var(--primary, #e71a0f)' : 'rgba(255, 255, 255, 0.06)',
+                          borderColor: currentPage === p ? 'var(--primary, #e71a0f)' : 'rgba(255, 255, 255, 0.1)',
+                          color: '#fff',
+                          fontWeight: currentPage === p ? 700 : 500
+                        }}
+                      >
+                        {p}
+                      </button>
+                    ))}
+
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => {
+                        setCurrentPage(p => Math.min(totalPages, p + 1));
+                        window.scrollTo({ top: 120, behavior: 'smooth' });
+                      }}
+                      style={{ padding: '7px 12px', fontSize: '0.85rem' }}
+                    >
+                      Sau <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>

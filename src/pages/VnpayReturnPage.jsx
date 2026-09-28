@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, ArrowRight, Home, Ticket, Clock, ShieldCheck, RefreshCw } from 'lucide-react';
 import { ApiService } from '../services/api';
+import { realtime } from '../services/realtimeService';
 
 const VNPAY_ERROR_CODES = {
   '07': 'Trừ tiền thành công nhưng giao dịch bị nghi ngờ gian lận.',
@@ -97,7 +98,30 @@ export default function VnpayReturnPage() {
     }
 
     verifyPayment();
-  }, [vnp_ResponseCode, vnp_TxnRef]);
+
+    // Lắng nghe realtime SSE từ booking-service: Ngay khi Kafka/Webhook commit, tự động hoàn tất
+    const unsubscribe = cleanBookingId && cleanBookingId.length === 36
+      ? realtime.subscribeToBookingPayment(
+          cleanBookingId,
+          (payload) => {
+            console.log('[Realtime] Payment confirmed via backend SSE:', payload);
+            setIsSuccess(true);
+            setLoading(false);
+            ApiService.getBookingById(cleanBookingId).then(b => setBookingDetails(b)).catch(() => {});
+          },
+          (payload) => {
+            console.warn('[Realtime] Payment failed via backend SSE:', payload);
+            setIsSuccess(false);
+            setLoading(false);
+            setErrorMsg(payload?.reason || 'Thanh toán không thành công.');
+          }
+        )
+      : () => {};
+
+    return () => {
+      unsubscribe();
+    };
+  }, [vnp_ResponseCode, vnp_TxnRef, cleanBookingId]);
 
   // Format VNPAY PayDate: YYYYMMDDHHmmss -> DD/MM/YYYY HH:mm
   const formatPayDate = (raw) => {

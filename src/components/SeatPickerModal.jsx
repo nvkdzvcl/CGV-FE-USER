@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { X, Clock, Check, Tag, ChevronDown, ChevronUp, Ticket, Gift, AlertCircle, Info } from 'lucide-react';
 import { ApiService } from '../services/api';
+import { realtime, REALTIME_EVENTS } from '../services/realtimeService';
 import { useSeatSocket } from '../hooks/useSeatSocket';
 import { useAuth } from '../hooks/useAuth';
 
@@ -66,6 +67,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   const [seats, setSeats] = useState(() => generateDefaultSeats(basePrice, { NORMAL: 0, VIP: 15000, SWEETBOX: 30000 }, DEFAULT_ROWS, DEFAULT_COLS));
   const [isLoadingSeats, setIsLoadingSeats] = useState(true);
+  const [isMaintenanceRoom, setIsMaintenanceRoom] = useState(false);
   const [selectedSeatIds, setSelectedSeatIds] = useState([]);
   const [timeLeft, setTimeLeft] = useState(240); // Phase 1: 4 phút (240s) giữ ghế
   const [showIdleWarning, setShowIdleWarning] = useState(false);
@@ -83,7 +85,15 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [successOrder, setSuccessOrder] = useState(null);
 
+  // Guest booking contact state
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestFormError, setGuestFormError] = useState('');
+
   const userTier = useMemo(() => {
+    if (!currentUser) return 'GUEST';
     const raw = currentUser?.membershipTier?.code
       || currentUser?.membershipTier
       || currentUser?.membership_tier
@@ -187,11 +197,16 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     ApiService.getAvailableVouchers(rawTotal, userTier)
       .then(list => {
         if (Array.isArray(list)) {
-          setAvailableVouchers(list);
+          if (!currentUser) {
+            // Khách vãng lai: chỉ áp dụng voucher cho tất cả (applicableTier == null hoặc ALL)
+            setAvailableVouchers(list.filter(v => !v.applicableTier || v.applicableTier === 'ALL'));
+          } else {
+            setAvailableVouchers(list);
+          }
         }
       })
       .catch(err => console.warn('Lỗi tải voucher khả dụng:', err));
-  }, [rawTotal, userTier]);
+  }, [rawTotal, userTier, currentUser]);
 
   // Realtime WebSocket for seat lock events
   const handleSocketSeatEvent = useCallback((event) => {
@@ -223,15 +238,43 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   const { isConnected: isSocketConnected } = useSeatSocket(showtimeId, handleSocketSeatEvent);
 
+  // Kiểm tra trạng thái bảo trì của phòng chiếu & rạp
+  useEffect(() => {
+    const roomStatus = activeShowtime?.roomResponse?.status || bookingContext?.room?.status;
+    const cinemaStatus = activeShowtime?.roomResponse?.cinemaResponse?.status || bookingContext?.cinema?.status;
+    if (roomStatus === 'MAINTENANCE' || (cinemaStatus && cinemaStatus !== 'ACTIVE')) {
+      setIsMaintenanceRoom(true);
+    } else {
+      setIsMaintenanceRoom(false);
+    }
+  }, [activeShowtime, bookingContext]);
+
+  // Ưu tiên roomId trực tiếp từ bookingContext hoặc showtime
+  const currentRoomId = bookingContext?.roomId
+    || bookingContext?.showtime?.roomId
+    || activeShowtime?.roomId
+    || activeShowtime?.roomResponse?.id
+    || bookingContext?.showtime?.roomResponse?.id;
+
+  // Lắng nghe realtime sự kiện phòng chuyển sang bảo trì kỹ thuật đột xuất
+  useEffect(() => {
+    if (!currentRoomId) return;
+    const unsubscribe = realtime.subscribe((event) => {
+      if (event?.type === REALTIME_EVENTS.ROOM_STATUS_CHANGED) {
+        if (event.payload?.roomId === currentRoomId && event.payload?.status === 'MAINTENANCE') {
+          setIsMaintenanceRoom(true);
+        } else if (event.payload?.roomId === currentRoomId && event.payload?.status === 'ACTIVE') {
+          setIsMaintenanceRoom(false);
+        }
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [currentRoomId]);
+
   // 4. Resolve roomId & Load real seats from DB by roomId with API-driven prices
   useEffect(() => {
-    // Ưu tiên roomId trực tiếp từ bookingContext hoặc showtime
-    const currentRoomId = bookingContext?.roomId
-      || bookingContext?.showtime?.roomId
-      || activeShowtime?.roomId
-      || activeShowtime?.roomResponse?.id
-      || bookingContext?.showtime?.roomResponse?.id;
-
     if (!currentRoomId && showtimeId && showtimeId.length === 36) {
       ApiService.getShowtimeById(showtimeId)
         .then(st => {
@@ -482,11 +525,9 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   // ─── Seat click handler ───
   const toggleSeat = async (id) => {
-    // 1. Bắt buộc đăng nhập trước khi giữ ghế (chống spam từ người dùng ẩn danh)
     if (isLoadingSeats) return;
-    if (!currentUser) {
-      alert('Vui lòng đăng nhập tài khoản trước khi chọn và giữ ghế!');
-      if (onOpenAuth) onOpenAuth('login');
+    if (isMaintenanceRoom) {
+      alert('Phòng chiếu này hiện đang được bảo trì kỹ thuật. Quý khách vui lòng chọn phòng khác!');
       return;
     }
 
@@ -565,6 +606,10 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       setCouponMsg('Vui lòng chọn ít nhất 1 ghế trước khi áp dụng mã giảm giá.');
       return;
     }
+    if (!currentUser && voucher.applicableTier && voucher.applicableTier !== 'ALL') {
+      setCouponMsg(`Mã '${voucher.code}' chỉ dành cho thành viên CGV. Vui lòng đăng nhập tài khoản để sử dụng!`);
+      return;
+    }
     const minVal = Number(voucher.minOrderValue || 0);
     if (minVal > 0 && rawTotal < minVal) {
       setCouponMsg(`Đơn tối thiểu ${formatVnd(minVal)} để dùng mã này (còn thiếu ${formatVnd(minVal - rawTotal)}).`);
@@ -585,7 +630,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       setCouponMsg('Vui lòng chọn ghế trước khi áp dụng mã giảm giá.');
       return;
     }
-    const result = await ApiService.validateVoucher(couponCode, rawTotal);
+    const result = await ApiService.validateVoucher(couponCode, rawTotal, userTier);
     if (result.valid) {
       setAppliedVoucher(result);
       setSelectedVoucher(result.voucher);
@@ -606,18 +651,52 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   };
 
   // ─── Checkout & VNPay Payment Flow ───
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
+    if (isMaintenanceRoom) {
+      alert('Phòng chiếu này hiện đang được bảo trì kỹ thuật, tạm ngưng nhận đặt vé. Quý khách vui lòng chọn phòng hoặc suất chiếu khác!');
+      return;
+    }
+
     if (selectedSeatIds.length === 0) {
       alert('Vui lòng chọn ít nhất một ghế ngồi.');
       return;
     }
 
     if (!currentUser) {
-      alert('Vui lòng đăng nhập tài khoản để tiến hành đặt vé và thanh toán!');
-      if (onOpenAuth) onOpenAuth('login');
+      // Khách vãng lai: Bắt buộc điền form thông tin trước khi thanh toán
+      setShowGuestForm(true);
       return;
     }
 
+    proceedCheckout(null);
+  };
+
+  const handleGuestSubmit = (e) => {
+    e.preventDefault();
+    if (!guestName.trim()) {
+      setGuestFormError('Vui lòng nhập họ và tên của bạn.');
+      return;
+    }
+    const cleanPhone = guestPhone.trim();
+    if (!cleanPhone || !/^(0|\+84)[3|5|7|8|9][0-9]{8}$/.test(cleanPhone)) {
+      setGuestFormError('Số điện thoại không hợp lệ (10 chữ số, ví dụ: 0912345678).');
+      return;
+    }
+    const cleanEmail = guestEmail.trim();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setGuestFormError('Email nhận vé không hợp lệ.');
+      return;
+    }
+    setGuestFormError('');
+    setShowGuestForm(false);
+    proceedCheckout({
+      guestName: guestName.trim(),
+      guestEmail: cleanEmail,
+      guestPhone: cleanPhone
+    });
+  };
+
+  const proceedCheckout = async (guestData = null) => {
     const targetShowtimeId = showtimeId;
     if (!targetShowtimeId || targetShowtimeId.length !== 36) {
       alert('Chưa có thông tin suất chiếu hợp lệ (UUID). Vui lòng chọn lại suất chiếu!');
@@ -653,12 +732,20 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     setIsCheckingOut(true);
     let createdBookingId = null;
     try {
-      // 1. Tạo đơn booking
-      const bookingRes = await ApiService.createBooking({
+      // 1. Tạo đơn booking (hỗ trợ cả khách đã đăng nhập và khách vãng lai)
+      const bookingPayload = {
         showtimeId: targetShowtimeId,
         seatIds: seatDbIds,
         promotionId: appliedVoucher?.voucher?.id || null
-      });
+      };
+
+      if (!currentUser && guestData) {
+        bookingPayload.guestName = guestData.guestName;
+        bookingPayload.guestEmail = guestData.guestEmail;
+        bookingPayload.guestPhone = guestData.guestPhone;
+      }
+
+      const bookingRes = await ApiService.createBooking(bookingPayload);
 
       const realBookingId = bookingRes?.id || bookingRes?.bookingId;
       if (!realBookingId) {
@@ -667,6 +754,31 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       createdBookingId = realBookingId;
 
       const amountToPay = bookingRes?.finalAmount || finalTotal;
+
+      // Lưu vé khách vãng lai vào localStorage để tra cứu lịch sử tự động
+      if (!currentUser && guestData) {
+        try {
+          const guestBookingItem = {
+            id: realBookingId,
+            showtimeId: targetShowtimeId,
+            movieTitle: activeShowtime?.movieTitle || bookingContext?.movieTitle || 'Phim CGV',
+            cinemaName: activeShowtime?.cinemaName || bookingContext?.cinemaName || 'CGV Cinema',
+            roomName: activeShowtime?.roomName || 'Phòng chiếu',
+            startTime: activeShowtime?.startTime || new Date().toISOString(),
+            seatNames: selectedSeatIds,
+            totalAmount: amountToPay,
+            guestName: guestData.guestName,
+            guestEmail: guestData.guestEmail,
+            guestPhone: guestData.guestPhone,
+            createdAt: new Date().toISOString(),
+            status: 'PENDING'
+          };
+          const existing = JSON.parse(localStorage.getItem('cgv_guest_bookings') || '[]');
+          localStorage.setItem('cgv_guest_bookings', JSON.stringify([guestBookingItem, ...existing.filter(b => b.id !== realBookingId)].slice(0, 30)));
+        } catch (e) {
+          console.warn('Lỗi lưu lịch sử vé khách vãng lai:', e);
+        }
+      }
 
       // 2. Tạo link thanh toán VNPay
       const vnpayUrl = await ApiService.createVnpayPaymentUrl(realBookingId, amountToPay);
@@ -785,6 +897,32 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
               <div className="screen-curve" />
               <span className="screen-text">MÀN HÌNH CHIẾU</span>
             </div>
+
+            {isMaintenanceRoom && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(185, 28, 28, 0.28))',
+                border: '1px solid #ef4444',
+                color: '#fca5a5',
+                borderRadius: 12,
+                padding: '14px 20px',
+                margin: '10px auto 20px',
+                maxWidth: 620,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                fontSize: '0.9rem',
+                fontWeight: 500,
+                boxShadow: '0 4px 16px rgba(239, 68, 68, 0.25)'
+              }}>
+                <AlertCircle size={26} style={{ color: '#ef4444', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: 700, color: '#fee2e2', fontSize: '0.95rem' }}>Phòng chiếu đang bảo trì kỹ thuật!</div>
+                  <div style={{ fontSize: '0.82rem', marginTop: 3, opacity: 0.9 }}>
+                    Phòng chiếu này đang tạm ngừng phục vụ để kiểm tra, bảo trì hệ thống ghế và âm thanh. Quý khách vui lòng chọn suất chiếu hoặc phòng khác.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Seat Map - Always visible */}
             <div className="seats-container" style={{ position: 'relative' }}>
@@ -1147,16 +1285,17 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
               {/* Right: Submit Button */}
               <button
                 className="btn-primary checkout-submit-btn"
-                disabled={selectedSeatIds.length === 0 || isCheckingOut}
+                disabled={selectedSeatIds.length === 0 || isCheckingOut || isMaintenanceRoom}
                 onClick={handleCheckout}
                 style={{
-                  opacity: selectedSeatIds.length === 0 ? 0.5 : 1,
+                  opacity: (selectedSeatIds.length === 0 || isMaintenanceRoom) ? 0.5 : 1,
                   display: 'flex', alignItems: 'center', gap: 8,
-                  whiteSpace: 'nowrap', padding: '12px 22px', fontSize: '0.92rem'
+                  whiteSpace: 'nowrap', padding: '12px 22px', fontSize: '0.92rem',
+                  cursor: isMaintenanceRoom ? 'not-allowed' : 'pointer'
                 }}
               >
                 <Ticket size={16} />
-                {isCheckingOut ? 'Đang khởi tạo VNPay...' : 'Thanh toán VNPay'}
+                {isMaintenanceRoom ? 'Phòng đang bảo trì' : (isCheckingOut ? 'Đang khởi tạo VNPay...' : 'Thanh toán VNPay')}
               </button>
             </div>
           </>
@@ -1184,6 +1323,178 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
             >
               Tôi vẫn đang chọn ghế
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Guest Contact Form Modal */}
+      {showGuestForm && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 140,
+            background: 'rgba(0, 0, 0, 0.78)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}
+          onClick={() => setShowGuestForm(false)}
+        >
+          <div
+            style={{
+              background: '#121622',
+              border: '1px solid rgba(255, 255, 255, 0.16)',
+              borderRadius: 16,
+              maxWidth: 460,
+              width: '100%',
+              padding: 24,
+              boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
+              position: 'relative'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: 'rgba(231, 26, 15, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#e71a0f'
+                }}>
+                  <Ticket size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: '#fff', fontSize: '1.08rem', fontWeight: 700 }}>Thông tin nhận vé điện tử</h3>
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Dành cho khách đặt vé không cần đăng nhập</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGuestForm(false)}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {guestFormError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#f87171',
+                padding: '8px 12px',
+                borderRadius: 8,
+                fontSize: '0.82rem',
+                marginBottom: 14
+              }}>
+                {guestFormError}
+              </div>
+            )}
+
+            <form onSubmit={handleGuestSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600, marginBottom: 6 }}>
+                  Họ và tên người nhận vé <span style={{ color: '#e71a0f' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ví dụ: Nguyễn Văn A"
+                  className="auth-input"
+                  value={guestName}
+                  onChange={e => setGuestName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600, marginBottom: 6 }}>
+                  Số điện thoại <span style={{ color: '#e71a0f' }}>*</span> (dùng tra cứu vé & nhận SMS)
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="Ví dụ: 0912345678"
+                  className="auth-input"
+                  value={guestPhone}
+                  onChange={e => setGuestPhone(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600, marginBottom: 6 }}>
+                  Email nhận vé điện tử <span style={{ color: '#e71a0f' }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="Ví dụ: email@gmail.com"
+                  className="auth-input"
+                  value={guestEmail}
+                  onChange={e => setGuestEmail(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 8,
+                padding: '10px 12px',
+                fontSize: '0.78rem',
+                color: '#94a3b8',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>Có tài khoản CGV?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowGuestForm(false);
+                    if (onOpenAuth) onOpenAuth('login');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#e71a0f',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Đăng nhập để tích điểm
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowGuestForm(false)}
+                  style={{ flex: 1, padding: '10px 16px', fontSize: '0.88rem' }}
+                >
+                  Quay lại
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ flex: 2, padding: '10px 16px', fontSize: '0.88rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  <Ticket size={16} />
+                  Xác nhận & Thanh toán
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

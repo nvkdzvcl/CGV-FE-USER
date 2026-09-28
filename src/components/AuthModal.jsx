@@ -8,7 +8,7 @@
  */
 
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, Eye, EyeOff, ChevronLeft } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, ChevronLeft, Phone } from 'lucide-react';
 import { login, registerInit, registerVerify, buildSocialLoginUrl } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
 import OtpInput from './OtpInput';
@@ -71,7 +71,7 @@ function formatCountdown(seconds) {
 }
 
 // ─────────── OTP Step ───────────
-function OtpStep({ email, password, fullName, onBack, onSuccess }) {
+function OtpStep({ email, password, fullName, phone, onBack, onSuccess }) {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   // Resend cooldown: 30s mỗi lần gửi lại
@@ -109,7 +109,7 @@ function OtpStep({ email, password, fullName, onBack, onSuccess }) {
     }
     setLoading(true);
     try {
-      const user = await registerVerify({ email, password, fullName, otp });
+      const user = await registerVerify({ email, password, fullName, phone, otp });
       toast.success('Đăng ký tài khoản thành công! Chào mừng bạn! 🎉');
       onSuccess(user);
     } catch (err) {
@@ -122,7 +122,7 @@ function OtpStep({ email, password, fullName, onBack, onSuccess }) {
   async function handleResend() {
     if (resendCooldown > 0) return;
     try {
-      await registerInit({ email, fullName, password });
+      await registerInit({ email, fullName, phone, password });
       toast.info('Đã gửi lại mã OTP về email của bạn.');
       // Reset cả hai countdown
       setResendCooldown(RESEND_COOLDOWN_SECONDS);
@@ -311,6 +311,7 @@ function LoginForm({ onClose, onForgotPassword }) {
 // ─────────── Register Form ───────────
 function RegisterForm({ onOtpStep }) {
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -318,7 +319,14 @@ function RegisterForm({ onOtpStep }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!fullName.trim() || !email.trim() || !password) return;
+    if (!fullName.trim() || !phone.trim() || !email.trim() || !password) {
+      toast.warning('Vui lòng điền đầy đủ họ tên, số điện thoại, email và mật khẩu.');
+      return;
+    }
+    if (!/^[0-9+]{9,13}$/.test(phone.trim())) {
+      toast.warning('Số điện thoại không hợp lệ (9-12 chữ số).');
+      return;
+    }
     if (password.length < 6) {
       toast.warning('Mật khẩu phải có ít nhất 6 ký tự.');
       return;
@@ -329,10 +337,11 @@ function RegisterForm({ onOtpStep }) {
       const res = await registerInit({
         email: email.trim(),
         fullName: fullName.trim(),
+        phone: phone.trim(),
         password,
       });
       toast.success(res.message || 'Mã OTP đã được gửi đến email của bạn!');
-      onOtpStep({ email: email.trim(), fullName: fullName.trim(), password });
+      onOtpStep({ email: email.trim(), fullName: fullName.trim(), phone: phone.trim(), password });
     } catch (err) {
       toast.error(err.message || 'Không thể gửi OTP. Vui lòng thử lại.');
     } finally {
@@ -359,8 +368,25 @@ function RegisterForm({ onOtpStep }) {
       </div>
 
       <div className="auth-form-group">
+        <label className="auth-label">Số điện thoại</label>
+        <div className="auth-input-wrap">
+          <Phone size={16} className="auth-input-icon" />
+          <input
+            type="tel"
+            className="auth-input auth-input-icon-left"
+            placeholder="0912345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            disabled={loading}
+            required
+            autoComplete="tel"
+          />
+        </div>
+      </div>
+
+      <div className="auth-form-group">
         <label className="auth-label">Email tài khoản</label>
-          <div className="auth-input-wrap">
+        <div className="auth-input-wrap">
           <Mail size={16} className="auth-input-icon" />
           <input
             type="email"
@@ -784,6 +810,7 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
             email={pendingRegistration.email}
             password={pendingRegistration.password}
             fullName={pendingRegistration.fullName}
+            phone={pendingRegistration.phone}
             onBack={handleOtpBack}
             onSuccess={handleRegisterSuccess}
           />

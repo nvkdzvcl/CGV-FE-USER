@@ -58,7 +58,7 @@ export async function login(credentials) {
 
 /**
  * Bước 1 đăng ký: gửi OTP về email.
- * @param {{ email: string, fullName: string, password: string }} payload
+ * @param {{ email: string, fullName: string, phone: string, password: string }} payload
  * @returns {Promise<{ message: string }>}
  */
 export async function registerInit(payload) {
@@ -71,8 +71,8 @@ export async function registerInit(payload) {
 
 /**
  * Bước 2 đăng ký: xác thực OTP và tạo tài khoản.
- * @param {{ email: string, fullName: string, password: string, otp: string }} payload
- * @returns {Promise<{ id, email, fullName, role, membershipTier }>}
+ * @param {{ email: string, fullName: string, phone: string, password: string, otp: string }} payload
+ * @returns {Promise<{ id, email, fullName, phone, role, membershipTier }>}
  */
 export async function registerVerify(payload) {
   const res = await authRequest(`${AUTH_BASE}/register/verify`, {
