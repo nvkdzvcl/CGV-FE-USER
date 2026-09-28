@@ -41,6 +41,7 @@ async function doFetch(path, options, token) {
       headers: {
         'Content-Type': 'application/json',
         'X-User-Id': userId,
+        'X-Guest-Session-Id': getSessionId(),
         ...authHeaders,
         ...(options.headers || {})
       },
@@ -51,11 +52,50 @@ async function doFetch(path, options, token) {
   }
 }
 
+import { realtime, REALTIME_EVENTS } from './realtimeService';
+
+const userMemoryCache = new Map();
+
+export const clearUserCache = (prefix = null) => {
+  if (!prefix) userMemoryCache.clear();
+  else {
+    for (const k of userMemoryCache.keys()) {
+      if (k.startsWith(prefix)) userMemoryCache.delete(k);
+    }
+  }
+};
+
+// Auto-sync realtime events: Clear memory cache and dispatch window event for live UI update
+if (typeof window !== 'undefined') {
+  realtime.subscribe((msg) => {
+    if (msg.type === REALTIME_EVENTS.MOVIE_STATUS_CHANGED) {
+      clearUserCache('/api/v1/catalogs/movies');
+      window.dispatchEvent(new CustomEvent('cgv_realtime_movie_updated', { detail: msg.payload }));
+    }
+    if (msg.type === REALTIME_EVENTS.CINEMA_STATUS_CHANGED) {
+      clearUserCache('/api/v1/catalogs/cinemas');
+      window.dispatchEvent(new CustomEvent('cgv_realtime_cinema_updated', { detail: msg.payload }));
+    }
+    if (msg.type === REALTIME_EVENTS.SHOWTIME_CHANGED) {
+      clearUserCache('/api/v1/catalogs/showtimes');
+      window.dispatchEvent(new CustomEvent('cgv_realtime_showtime_updated', { detail: msg.payload }));
+    }
+  });
+}
+
 /**
  * Base HTTP request handler with automatic token injection, automatic 401 refresh token,
  * error handling, and mock fallback
  */
 async function request(path, options = {}, fallbackData = null) {
+  const method = (options.method || 'GET').toUpperCase();
+  if (method === 'GET' && options.cacheTtl) {
+    const cached = userMemoryCache.get(path);
+    if (cached && Date.now() - cached.time < options.cacheTtl) {
+      return cached.data;
+    }
+  }
+
   try {
     const tokens = getTokens();
     let res = await doFetch(path, options, tokens?.accessToken);
@@ -124,7 +164,11 @@ async function request(path, options = {}, fallbackData = null) {
       throw new Error(errMsg);
     }
 
-    return json?.data !== undefined ? json.data : json;
+    const result = json?.data !== undefined ? json.data : json;
+    if (method === 'GET' && options.cacheTtl && result) {
+      userMemoryCache.set(path, { time: Date.now(), data: result });
+    }
+    return result;
   } catch (err) {
     if (fallbackData !== null) {
       console.warn(`[API Fallback] ${path} -> using fallback data:`, err.message);
@@ -183,7 +227,7 @@ export const ApiService = {
   getCinemas: async (regionId = null) => {
     const data = await request(
       '/api/v1/catalogs/cinemas?page=0&size=50',
-      {},
+      { cacheTtl: 60000 },
       CINEMAS
     );
     const cinemaList = Array.isArray(data) ? data : (data?.data || CINEMAS);
@@ -192,7 +236,7 @@ export const ApiService = {
   },
 
   getRegions: async () => {
-    const data = await request('/api/v1/catalogs/regions', {}, REGIONS);
+    const data = await request('/api/v1/catalogs/regions', { cacheTtl: 120000 }, REGIONS);
     return Array.isArray(data) ? data : (data?.data || REGIONS);
   },
 
@@ -280,7 +324,7 @@ export const ApiService = {
   // ─────────────────────────────────────────────
 
   getPromotions: async () => {
-    const data = await request('/api/v1/marketings/promotions/active', {}, PROMOTIONS);
+    const data = await request('/api/v1/marketings/promotions/active', { cacheTtl: 60000 }, PROMOTIONS);
     const list = Array.isArray(data) ? data : (data?.data || PROMOTIONS);
     return list.length > 0 ? list : PROMOTIONS;
   },
@@ -439,6 +483,13 @@ export const ApiService = {
     return await request(`/api/v1/bookings/${bookingId}/cancel`, {
       method: 'PUT'
     });
+  },
+
+  lookupGuestBookings: async (payload) => {
+    return await request('/api/v1/bookings/guest-lookup', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }, []);
   },
 
   // ─────────────────────────────────────────────

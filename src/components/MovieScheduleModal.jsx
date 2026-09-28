@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { X, Calendar, MapPin, Navigation, Clock, Film, ChevronRight, Loader2, Sparkles, Volume2, Globe } from 'lucide-react';
 import { ApiService } from '../services/api';
+import { realtime, REALTIME_EVENTS } from '../services/realtimeService';
 import CgvAuraLoader from './CgvAuraLoader';
 import '../styles/schedule-modal.css';
 
@@ -122,14 +123,16 @@ export default function MovieScheduleModal({ movie, onClose, onSelectShowtime })
             regionId: c.regionId,
             regionName: c.regionName,
             distanceInKm: c.distanceInKm,
-            showtimes: (c.showtimes || []).map(st => ({
-              ...st,
-              id: st.showtimeId,
-              showtimeId: st.showtimeId,
-              roomId: st.roomId,
-              roomName: st.roomName
-            }))
-          }));
+            showtimes: (c.showtimes || [])
+              .filter(st => st.status !== 'CANCELLED' && st.status !== 'CLOSED' && st.roomStatus !== 'MAINTENANCE')
+              .map(st => ({
+                ...st,
+                id: st.showtimeId,
+                showtimeId: st.showtimeId,
+                roomId: st.roomId,
+                roomName: st.roomName
+              }))
+          })).filter(c => c.showtimes.length > 0);
           setCinemasWithShowtimes(enriched);
           return;
         }
@@ -144,6 +147,13 @@ export default function MovieScheduleModal({ movie, onClose, onSelectShowtime })
 
       const cinemaGroups = {};
       showtimeList.forEach(st => {
+        // Loại bỏ hoàn toàn phòng đang bảo trì hoặc rạp không hoạt động hoặc suất đã hủy
+        const rStatus = st.roomResponse?.status || st.roomStatus;
+        const cStatus = st.roomResponse?.cinemaResponse?.status || cinemasMap[st.roomResponse?.cinemaResponse?.id || st.cinemaId]?.status;
+        const sStatus = st.status;
+        if (rStatus === 'MAINTENANCE' || sStatus === 'CANCELLED' || sStatus === 'CLOSED') return;
+        if (cStatus && cStatus !== 'ACTIVE') return;
+
         const cId = st.roomResponse?.cinemaResponse?.id || st.cinemaId;
         if (!cId) return;
         const cInfo = st.roomResponse?.cinemaResponse;
@@ -187,6 +197,23 @@ export default function MovieScheduleModal({ movie, onClose, onSelectShowtime })
 
   useEffect(() => {
     fetchShowtimes();
+  }, [fetchShowtimes]);
+
+  // Lắng nghe realtime SSE / BroadcastChannel: Tự động cập nhật lịch chiếu khi Admin sửa trạng thái Phòng / Rạp / Suất chiếu
+  useEffect(() => {
+    const unsubscribe = realtime.subscribe((event) => {
+      if (
+        event?.type === REALTIME_EVENTS.ROOM_STATUS_CHANGED ||
+        event?.type === REALTIME_EVENTS.CINEMA_STATUS_CHANGED ||
+        event?.type === REALTIME_EVENTS.SHOWTIME_CHANGED
+      ) {
+        console.log('%c[MovieScheduleModal] 🔄 Nhận sự kiện Realtime, cập nhật lịch chiếu ngay lập tức:', 'color: #10b981; font-weight: bold;', event);
+        fetchShowtimes();
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [fetchShowtimes]);
 
   // Bật/tắt "Rạp gần tôi"

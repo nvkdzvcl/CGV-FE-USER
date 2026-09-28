@@ -10,6 +10,9 @@ import {
   Globe,
   Sparkles,
   ChevronRight,
+  ChevronLeft,
+  Search,
+  X,
   Info
 } from 'lucide-react';
 import CinemaCard from '../components/CinemaCard';
@@ -118,6 +121,9 @@ export default function CinemasPage({ onOpenBooking }) {
 
   // Sidebar filters
   const [selectedFacilities, setSelectedFacilities] = useState(ALL_FACILITIES);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [cinemaPage, setCinemaPage] = useState(1);
+  const cinemaPageSize = 8;
 
   const [isLocating, setIsLocating] = useState(false);
   const [isNearbyActive, setIsNearbyActive] = useState(false);
@@ -127,16 +133,24 @@ export default function CinemasPage({ onOpenBooking }) {
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
 
   // 1. Fetch initial cinemas & regions
-  useEffect(() => {
+  const loadCinemas = () => {
     ApiService.getCinemas().then(res => {
       const list = Array.isArray(res) ? res : (res?.data || []);
       if (list.length > 0) {
         setCinemas(list);
-        // Find default cinema for TP.HCM (region 2) or first
-        const defaultCin = list.find(c => c.regionId === 2 || c.region?.id === 2) || list[0];
-        setSelectedCinema(defaultCin);
+        setSelectedCinema(prev => {
+          if (!prev) {
+            return list.find(c => c.regionId === 2 || c.region?.id === 2) || list[0];
+          }
+          const updated = list.find(c => c.id === prev.id);
+          return updated || prev;
+        });
       }
     }).catch(e => console.warn('Using fallback cinemas:', e.message));
+  };
+
+  useEffect(() => {
+    loadCinemas();
 
     ApiService.getRegions().then(res => {
       const list = Array.isArray(res) ? res : (res?.data || []);
@@ -144,6 +158,17 @@ export default function CinemasPage({ onOpenBooking }) {
         setRegions(list);
       }
     }).catch(e => console.warn('Using fallback regions:', e.message));
+
+    const handleCinemaUpdate = () => {
+      loadCinemas();
+    };
+
+    window.addEventListener('cgv_realtime_cinema_updated', handleCinemaUpdate);
+    window.addEventListener('cgv_realtime_showtime_updated', handleCinemaUpdate);
+    return () => {
+      window.removeEventListener('cgv_realtime_cinema_updated', handleCinemaUpdate);
+      window.removeEventListener('cgv_realtime_showtime_updated', handleCinemaUpdate);
+    };
   }, []);
 
   // 2. Fetch real schedule whenever selected cinema or active date changes
@@ -209,9 +234,23 @@ export default function CinemasPage({ onOpenBooking }) {
     );
   };
 
+  useEffect(() => {
+    setCinemaPage(1);
+  }, [searchKeyword, selectedRegionId, selectedFacilities, isNearbyActive]);
+
   // Filter and sort cinemas list
   const filteredCinemas = useMemo(() => {
     let list = [...cinemas];
+
+    // Keyword search
+    if (searchKeyword.trim()) {
+      const q = searchKeyword.toLowerCase().trim();
+      list = list.filter(c =>
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q)) ||
+        (c.city && c.city.toLowerCase().includes(q))
+      );
+    }
 
     // Region filter
     if (!isNearbyActive && selectedRegionId !== 'all') {
@@ -231,7 +270,13 @@ export default function CinemasPage({ onOpenBooking }) {
     }
 
     return list;
-  }, [cinemas, isNearbyActive, selectedRegionId, selectedFacilities]);
+  }, [cinemas, searchKeyword, isNearbyActive, selectedRegionId, selectedFacilities]);
+
+  const totalCinemaPages = Math.max(1, Math.ceil(filteredCinemas.length / cinemaPageSize));
+  const paginatedCinemas = useMemo(() => {
+    const start = (cinemaPage - 1) * cinemaPageSize;
+    return filteredCinemas.slice(start, start + cinemaPageSize);
+  }, [filteredCinemas, cinemaPage, cinemaPageSize]);
 
   const heroCinema = selectedCinema || filteredCinemas[0] || CINEMAS[0];
   const heroFacilities = useMemo(() => {
@@ -453,28 +498,140 @@ export default function CinemasPage({ onOpenBooking }) {
             </div>
           </div>
 
-          {/* Rạp chiếu tại khu vực */}
-          <div className="section-header">
-            <div className="section-title">
+          {/* Rạp chiếu tại khu vực & Ô tìm kiếm rạp */}
+          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+            <div className="section-title" style={{ margin: 0 }}>
               <Navigation className="section-title-icon" size={22} />
               <span>Rạp chiếu tại khu vực ({filteredCinemas.length})</span>
             </div>
-          </div>
 
-          <div className="cinemas-list-grid">
-            {filteredCinemas.map(c => (
-              <CinemaCard
-                key={c.id}
-                cinema={c}
-                isSelected={selectedCinema?.id === c.id}
-                onSelectCinema={(cin) => {
-                  setSelectedCinema(cin);
-                  const scheduleEl = document.getElementById('cinema-schedule-block');
-                  if (scheduleEl) scheduleEl.scrollIntoView({ behavior: 'smooth' });
+            {/* Quick search input */}
+            <div style={{ position: 'relative', width: 280, maxWidth: '100%' }}>
+              <Search size={15} style={{
+                position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                color: '#94a3b8'
+              }} />
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={e => setSearchKeyword(e.target.value)}
+                placeholder="Tìm tên cụm rạp, địa chỉ, quận..."
+                style={{
+                  width: '100%',
+                  padding: '8px 32px 8px 34px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: 20,
+                  color: '#fff',
+                  fontSize: '0.82rem',
+                  outline: 'none'
                 }}
               />
-            ))}
+              {searchKeyword && (
+                <button
+                  type="button"
+                  onClick={() => setSearchKeyword('')}
+                  style={{
+                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 2
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
+
+          {filteredCinemas.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+              <MapPin size={40} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+              <p>Không tìm thấy rạp chiếu nào phù hợp với bộ lọc hoặc từ khóa tìm kiếm.</p>
+            </div>
+          ) : (
+            <>
+              <div className="cinemas-list-grid">
+                {paginatedCinemas.map(c => (
+                  <CinemaCard
+                    key={c.id}
+                    cinema={c}
+                    isSelected={selectedCinema?.id === c.id}
+                    onSelectCinema={(cin) => {
+                      setSelectedCinema(cin);
+                      const scheduleEl = document.getElementById('cinema-schedule-block');
+                      if (scheduleEl) scheduleEl.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  />
+                ))}
+              </div>
+
+              {totalCinemaPages > 1 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: 20,
+                  marginBottom: 28,
+                  padding: '12px 18px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 12,
+                  flexWrap: 'wrap',
+                  gap: 12
+                }}>
+                  <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                    Hiển thị <strong style={{ color: '#fff' }}>{(cinemaPage - 1) * cinemaPageSize + 1}</strong> - <strong style={{ color: '#fff' }}>{Math.min(cinemaPage * cinemaPageSize, filteredCinemas.length)}</strong> trên tổng số <strong style={{ color: '#fff' }}>{filteredCinemas.length}</strong> rạp
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={cinemaPage <= 1}
+                      onClick={() => setCinemaPage(p => Math.max(1, p - 1))}
+                      style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                    >
+                      <ChevronLeft size={15} /> Trước
+                    </button>
+
+                    {Array.from({ length: totalCinemaPages }, (_, i) => i + 1).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setCinemaPage(p)}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 6,
+                          border: '1px solid',
+                          fontSize: '0.82rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: cinemaPage === p ? 'var(--primary, #e71a0f)' : 'rgba(255, 255, 255, 0.06)',
+                          borderColor: cinemaPage === p ? 'var(--primary, #e71a0f)' : 'rgba(255, 255, 255, 0.1)',
+                          color: '#fff',
+                          fontWeight: cinemaPage === p ? 700 : 500
+                        }}
+                      >
+                        {p}
+                      </button>
+                    ))}
+
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={cinemaPage >= totalCinemaPages}
+                      onClick={() => setCinemaPage(p => Math.min(totalCinemaPages, p + 1))}
+                      style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+                    >
+                      Sau <ChevronRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           <section className="schedule-section" id="cinema-schedule-block">
             <div className="schedule-cinema-header">

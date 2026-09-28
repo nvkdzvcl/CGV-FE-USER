@@ -10,6 +10,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { ApiService } from './services/api';
+import toast from './services/toastService';
 
 import HomePage from './pages/HomePage';
 import MoviesPage from './pages/MoviesPage';
@@ -28,6 +29,28 @@ function AppContent() {
   const [authModal, setAuthModal] = useState({ isOpen: false, tab: 'login' });
   const [scheduleMovie, setScheduleMovie] = useState(null);
   const [bookingContext, setBookingContext] = useState(null);
+
+  // Real-time synchronization notifications
+  useEffect(() => {
+    const handleMovieUpdated = (e) => {
+      const payload = e.detail;
+      const statusText = payload?.showingStatus === 'NOW_SHOWING' ? 'Đang chiếu' : (payload?.showingStatus === 'COMING_SOON' ? 'Sắp chiếu' : 'Đã kết thúc / Ngừng chiếu');
+      toast.info(`🎬 Trạng thái phim ${payload?.title ? `"${payload.title}"` : ''} vừa cập nhật sang [${statusText}].`);
+    };
+
+    const handleCinemaUpdated = (e) => {
+      const payload = e.detail;
+      const statusText = payload?.status === 'ACTIVE' ? 'Hoạt động' : (payload?.status === 'MAINTENANCE' ? 'Đang bảo trì kỹ thuật' : 'Tạm ngưng');
+      toast.info(`🏢 Cụm rạp ${payload?.name ? `"${payload.name}"` : ''} vừa cập nhật trạng thái [${statusText}].`);
+    };
+
+    window.addEventListener('cgv_realtime_movie_updated', handleMovieUpdated);
+    window.addEventListener('cgv_realtime_cinema_updated', handleCinemaUpdated);
+    return () => {
+      window.removeEventListener('cgv_realtime_movie_updated', handleMovieUpdated);
+      window.removeEventListener('cgv_realtime_cinema_updated', handleCinemaUpdated);
+    };
+  }, []);
 
   // Tự động rollback / hủy đơn vé đang chờ nếu người dùng back về từ cổng thanh toán VNPay
   useEffect(() => {
