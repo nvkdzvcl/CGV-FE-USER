@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { X, Clock, Check, Tag, ChevronDown, ChevronUp, Ticket, Gift, AlertCircle, Info } from 'lucide-react';
-import { ApiService } from '../services/api';
+import { ApiService, getSessionId } from '../services/api';
 import { realtime, REALTIME_EVENTS } from '../services/realtimeService';
 import { useSeatSocket } from '../hooks/useSeatSocket';
 import { useAuth } from '../hooks/useAuth';
@@ -47,7 +47,8 @@ function generateDefaultSeats(basePrice = 85000, surcharges = {}, rows = DEFAULT
 
 export default function SeatPickerModal({ bookingContext, onClose, onBookingSuccess, onOpenAuth }) {
   const { currentUser } = useAuth();
-  const currentUserId = currentUser?.id || 'anonymous';
+  const sessionId = getSessionId();
+  const currentUserId = currentUser?.id || sessionId;
   const [activeShowtime, setActiveShowtime] = useState(bookingContext?.showtime || null);
   const showtimeId = activeShowtime?.id || bookingContext?.showtime?.id || bookingContext?.showtimeId;
 
@@ -208,6 +209,18 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       .catch(err => console.warn('Lỗi tải voucher khả dụng:', err));
   }, [rawTotal, userTier, currentUser]);
 
+  // Khi khách vãng lai đăng nhập thành công tài khoản, tự động chuyển giao quyền giữ các ghế đã chọn sang account
+  useEffect(() => {
+    if (currentUser?.id && selectedSeatIds.length > 0 && showtimeId && showtimeId.length === 36) {
+      const seatDbIds = selectedSeatIds.map(id => seats[id]?.dbId).filter(id => id && id.length === 36);
+      if (seatDbIds.length > 0) {
+        ApiService.transferSeatLocks(showtimeId, seatDbIds, sessionId).catch(err => {
+          console.warn('Lỗi transfer seat lock khi login:', err);
+        });
+      }
+    }
+  }, [currentUser?.id]);
+
   // Realtime WebSocket for seat lock events
   const handleSocketSeatEvent = useCallback((event) => {
     if (!event?.seatIds || !Array.isArray(event.seatIds)) return;
@@ -218,7 +231,8 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
         const seatKey = Object.keys(updated).find(k => updated[k]?.dbId === targetId || k === targetId);
         if (!seatKey || !updated[seatKey]) return;
         if (event.type === 'LOCK') {
-          if (event.userId !== currentUserId) {
+          const isMyLock = event.userId === currentUserId || event.userId === sessionId;
+          if (!isMyLock) {
             updated[seatKey] = { ...updated[seatKey], status: 'holding' };
             changed = true;
           }
@@ -234,7 +248,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       });
       return changed ? updated : prevSeats;
     });
-  }, [currentUserId]);
+  }, [currentUserId, sessionId]);
 
   const { isConnected: isSocketConnected } = useSeatSocket(showtimeId, handleSocketSeatEvent);
 
@@ -357,7 +371,9 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
           if (bookedSet.has(sIdStr) || s.isActive === false) {
             currentStatus = 'booked';
           } else if (locksSet.has(sIdStr)) {
-            currentStatus = 'holding';
+            if (!selectedSeatIdsRef.current.includes(id)) {
+              currentStatus = 'holding';
+            }
           }
 
           updated[id] = {
@@ -736,7 +752,8 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       const bookingPayload = {
         showtimeId: targetShowtimeId,
         seatIds: seatDbIds,
-        promotionId: appliedVoucher?.voucher?.id || null
+        promotionId: appliedVoucher?.voucher?.id || null,
+        guestSessionId: sessionId
       };
 
       if (!currentUser && guestData) {
@@ -970,7 +987,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
                         return (
                           <div
                             key={id}
-                            className={`seat-item ${s.type || 'normal'} ${s.status || 'available'} ${isSelected ? 'selected' : ''} ${pairClass}`}
+                            className={`seat-item ${s.type || 'normal'} ${isSelected ? 'selected' : (s.status || 'available')} ${pairClass}`}
                             onClick={() => toggleSeat(id)}
                             title={`Ghế ${id} — ${(s.type || 'NORMAL').toUpperCase()} — ${formatVnd(s.price)}`}
                           >
