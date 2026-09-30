@@ -4,7 +4,7 @@ import { refreshToken } from './authService';
 
 const API_BASE = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8000';
 
-function getSessionId() {
+export function getSessionId() {
   let sId = localStorage.getItem('cgv_session_id');
   if (!sId) {
     sId = 'sess-' + Math.random().toString(36).substring(2, 10);
@@ -441,7 +441,20 @@ export const ApiService = {
   releaseSeats: async (showtimeId, seatIds) => {
     return await request('/api/v1/bookings/seat-locks', {
       method: 'DELETE',
-      body: JSON.stringify({ showtimeId, seatIds })
+      body: JSON.stringify({ showtimeId, seatIds, guestSessionId: getSessionId() })
+    });
+  },
+
+  transferSeatLocks: async (showtimeId, seatIds, guestSessionId = null) => {
+    return await request('/api/v1/bookings/seat-locks/transfer', {
+      method: 'POST',
+      body: JSON.stringify({
+        showtimeId,
+        seatIds,
+        guestSessionId: guestSessionId || getSessionId()
+      })
+    }).catch(err => {
+      console.warn('Lỗi transfer seat lock khi đăng nhập:', err);
     });
   },
 
@@ -452,10 +465,14 @@ export const ApiService = {
   },
 
   createBooking: async (bookingPayload) => {
-    // bookingPayload: { showtimeId, seatIds, promotionId }
+    // Tự động đính kèm guestSessionId để hỗ trợ chuyển giao phiên khách vãng lai sang user
+    const payload = {
+      ...bookingPayload,
+      guestSessionId: bookingPayload.guestSessionId || getSessionId()
+    };
     return await request('/api/v1/bookings', {
       method: 'POST',
-      body: JSON.stringify(bookingPayload)
+      body: JSON.stringify(payload)
     });
   },
 
