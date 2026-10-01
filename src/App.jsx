@@ -52,38 +52,6 @@ function AppContent() {
     };
   }, []);
 
-  // Tự động rollback / hủy đơn vé đang chờ nếu người dùng back về từ cổng thanh toán VNPay
-  useEffect(() => {
-    const checkAndRollbackAbandonedCheckout = () => {
-      const activeCheckoutStr = sessionStorage.getItem('cgv_active_checkout');
-      if (activeCheckoutStr) {
-        if (!window.location.pathname.includes('/vnpay-return')) {
-          try {
-            const checkout = JSON.parse(activeCheckoutStr);
-            sessionStorage.removeItem('cgv_active_checkout');
-            if (checkout?.bookingId) {
-              console.log('Phát hiện người dùng rời cổng thanh toán VNPay, tự động hủy đơn và giải phóng ghế:', checkout.bookingId);
-              ApiService.cancelBooking(checkout.bookingId).catch(err => {
-                console.warn('Lỗi rollback booking dang dở:', err);
-              });
-            }
-          } catch (e) {
-            sessionStorage.removeItem('cgv_active_checkout');
-          }
-        }
-      }
-    };
-
-    window.addEventListener('pageshow', checkAndRollbackAbandonedCheckout);
-    window.addEventListener('focus', checkAndRollbackAbandonedCheckout);
-    checkAndRollbackAbandonedCheckout();
-
-    return () => {
-      window.removeEventListener('pageshow', checkAndRollbackAbandonedCheckout);
-      window.removeEventListener('focus', checkAndRollbackAbandonedCheckout);
-    };
-  }, []);
-
   const handleOpenAuth = (tab = 'login') => {
     setAuthModal({ isOpen: true, tab });
   };

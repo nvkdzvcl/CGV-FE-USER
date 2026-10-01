@@ -433,6 +433,9 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   // Giải phóng toàn bộ ghế ngay lập tức khi người dùng thoát hoặc đóng màn hình
   useEffect(() => {
     return () => {
+      // Nếu đang chuyển hướng sang VNPay thì KHÔNG release ghế
+      if (sessionStorage.getItem('cgv_active_checkout')) return;
+
       if (!successOrderRef.current && selectedSeatIdsRef.current.length > 0 && showtimeIdRef.current && showtimeIdRef.current.length === 36) {
         const dbIds = selectedSeatIdsRef.current
           .map(id => seatsRef.current[id]?.dbId)
@@ -448,6 +451,12 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     if (showtimeId) {
       try {
         localStorage.removeItem(`cgv_selected_seats_${showtimeId}`);
+        const activeCheckoutStr = sessionStorage.getItem('cgv_active_checkout');
+        if (activeCheckoutStr) {
+          const chk = JSON.parse(activeCheckoutStr);
+          if (chk?.bookingId) ApiService.cancelBooking(chk.bookingId).catch(() => {});
+          sessionStorage.removeItem('cgv_active_checkout');
+        }
       } catch {}
     }
     if (selectedSeatIds.length > 0 && !successOrder && showtimeId && showtimeId.length === 36) {
@@ -770,29 +779,48 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     setIsCheckingOut(true);
     let createdBookingId = null;
     try {
-      // 1. Tạo đơn booking (hỗ trợ cả khách đã đăng nhập và khách vãng lai)
-      const bookingPayload = {
-        showtimeId: targetShowtimeId,
-        seatIds: seatDbIds,
-        promotionId: appliedVoucher?.voucher?.id || null,
-        guestSessionId: sessionId
-      };
+      // 1. Kiểm tra nếu có đơn vé pending checkout sẵn cho đúng suất chiếu này (ví dụ quay lại từ VNPay để tiếp tục thanh toán)
+      let realBookingId = null;
+      let bookingRes = null;
+      let amountToPay = finalTotal;
 
-      if (!currentUser && guestData) {
-        bookingPayload.guestName = guestData.guestName;
-        bookingPayload.guestEmail = guestData.guestEmail;
-        bookingPayload.guestPhone = guestData.guestPhone;
+      const activeCheckoutStr = sessionStorage.getItem('cgv_active_checkout');
+      if (activeCheckoutStr) {
+        try {
+          const prevCheckout = JSON.parse(activeCheckoutStr);
+          const isSameShowtime = prevCheckout?.showtimeId === targetShowtimeId;
+          const isRecent = prevCheckout?.timestamp && (Date.now() - prevCheckout.timestamp < 9 * 60 * 1000);
+          if (isSameShowtime && isRecent && prevCheckout?.bookingId) {
+            realBookingId = prevCheckout.bookingId;
+            amountToPay = prevCheckout.amountToPay || finalTotal;
+          }
+        } catch {}
       }
 
-      const bookingRes = await ApiService.createBooking(bookingPayload);
-
-      const realBookingId = bookingRes?.id || bookingRes?.bookingId;
       if (!realBookingId) {
-        throw new Error('Không nhận được mã đặt vé từ máy chủ.');
+        // Tạo đơn booking mới (hỗ trợ cả khách đã đăng nhập và khách vãng lai)
+        const bookingPayload = {
+          showtimeId: targetShowtimeId,
+          seatIds: seatDbIds,
+          promotionId: appliedVoucher?.voucher?.id || null,
+          guestSessionId: sessionId
+        };
+
+        if (!currentUser && guestData) {
+          bookingPayload.guestName = guestData.guestName;
+          bookingPayload.guestEmail = guestData.guestEmail;
+          bookingPayload.guestPhone = guestData.guestPhone;
+        }
+
+        bookingRes = await ApiService.createBooking(bookingPayload);
+
+        realBookingId = bookingRes?.id || bookingRes?.bookingId;
+        if (!realBookingId) {
+          throw new Error('Không nhận được mã đặt vé từ máy chủ.');
+        }
+        amountToPay = bookingRes?.finalAmount || finalTotal;
       }
       createdBookingId = realBookingId;
-
-      const amountToPay = bookingRes?.finalAmount || finalTotal;
 
       // Lưu vé khách vãng lai vào localStorage để tra cứu lịch sử tự động
       if (!currentUser && guestData) {
@@ -826,6 +854,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
         sessionStorage.setItem('cgv_active_checkout', JSON.stringify({
           bookingId: realBookingId,
           showtimeId: targetShowtimeId,
+          amountToPay,
           timestamp: Date.now()
         }));
         window.location.href = vnpayUrl;
