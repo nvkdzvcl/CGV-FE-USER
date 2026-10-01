@@ -214,8 +214,11 @@ export async function logout(refreshTokenValue) {
 // ───────────────────────────────────────────────
 
 export function buildSocialLoginUrl(provider) {
-  const keycloakBase =
-    import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8180';
+  let keycloakBase =
+    import.meta.env.VITE_KEYCLOAK_URL || 'https://d2z63drupmmdh8.cloudfront.net';
+  if (keycloakBase.startsWith('http://') && !keycloakBase.includes('localhost')) {
+    keycloakBase = 'https://d2z63drupmmdh8.cloudfront.net';
+  }
   const realm = import.meta.env.VITE_KEYCLOAK_REALM || 'cgv-realm';
   const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'CGV_App';
 

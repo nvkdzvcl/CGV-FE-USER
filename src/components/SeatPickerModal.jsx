@@ -69,7 +69,24 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   const [seats, setSeats] = useState(() => generateDefaultSeats(basePrice, { NORMAL: 0, VIP: 15000, SWEETBOX: 30000 }, DEFAULT_ROWS, DEFAULT_COLS));
   const [isLoadingSeats, setIsLoadingSeats] = useState(true);
   const [isMaintenanceRoom, setIsMaintenanceRoom] = useState(false);
-  const [selectedSeatIds, setSelectedSeatIds] = useState([]);
+  const [selectedSeatIds, setSelectedSeatIds] = useState(() => {
+    try {
+      if (!showtimeId) return [];
+      const saved = localStorage.getItem(`cgv_selected_seats_${showtimeId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (!showtimeId) return;
+    if (selectedSeatIds.length > 0) {
+      localStorage.setItem(`cgv_selected_seats_${showtimeId}`, JSON.stringify(selectedSeatIds));
+    } else {
+      localStorage.removeItem(`cgv_selected_seats_${showtimeId}`);
+    }
+  }, [selectedSeatIds, showtimeId]);
   const [timeLeft, setTimeLeft] = useState(240); // Phase 1: 4 phút (240s) giữ ghế
   const [showIdleWarning, setShowIdleWarning] = useState(false);
   const [idleCountdown, setIdleCountdown] = useState(15);
@@ -428,6 +445,11 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   }, []);
 
   const handleCloseModal = useCallback(() => {
+    if (showtimeId) {
+      try {
+        localStorage.removeItem(`cgv_selected_seats_${showtimeId}`);
+      } catch {}
+    }
     if (selectedSeatIds.length > 0 && !successOrder && showtimeId && showtimeId.length === 36) {
       const dbIds = selectedSeatIds.map(id => seats[id]?.dbId).filter(id => id && id.length === 36);
       if (dbIds.length > 0) ApiService.releaseSeats(showtimeId, dbIds).catch(() => {});
