@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, User, Eye, EyeOff, ChevronLeft, Phone } from 'lucide-react';
 import { login, registerInit, registerVerify, buildSocialLoginUrl } from '../services/authService';
+import { getMyProfile } from '../services/userService';
 import { useAuth } from '../hooks/useAuth';
 import OtpInput from './OtpInput';
 import toast from '../services/toastService';
@@ -225,7 +226,14 @@ function LoginForm({ onClose, onForgotPassword }) {
     setLoading(true);
     try {
       const tokens = await login({ username: username.trim(), password });
-      loginWithTokens(tokens);
+      // Lấy thông tin user trực tiếp từ Database PostgreSQL để đảm bảo fullName luôn chính xác từ DB
+      let dbUser = null;
+      try {
+        dbUser = await getMyProfile(tokens.accessToken);
+      } catch (profileErr) {
+        console.warn('Lấy thông tin profile từ DB thất bại, fallback token claims:', profileErr);
+      }
+      loginWithTokens(tokens, dbUser);
       toast.success('Đăng nhập thành công! Chào mừng bạn! 👋');
       onClose();
     } catch (err) {

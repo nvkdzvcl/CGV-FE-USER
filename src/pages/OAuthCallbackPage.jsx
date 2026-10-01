@@ -122,24 +122,25 @@ export default function OAuthCallbackPage() {
         console.warn('socialSync warning:', syncErr.message);
       }
 
-      const savedFullName = userData?.fullName || claims?.name || '';
+      // CHỈ lấy fullName từ PostgreSQL database (userData), TUYỆT ĐỐI không fallback về claims.name của Google/Keycloak
+      const dbFullName = userData?.fullName?.trim() || '';
 
       // Lưu tokens (gồm cả accessToken và refreshToken) + tạo user object
       loginWithTokens(tokens, {
         id: userData?.id || claims.sub,
         email: userData?.email || claims.email || '',
-        fullName: savedFullName,
+        fullName: dbFullName,
         role: 'USER',
         membershipTier: userData?.membershipTier || { code: 'MEMBER', name: 'Member' },
       });
 
       // Kiểm tra xem tài khoản này đã có họ và tên lưu trong DB chưa
-      const hasSavedName = !!(savedFullName && savedFullName.trim().length > 0);
-      if (!hasSavedName) {
+      // Nếu chưa có (email mới đăng nhập Google/FB lần đầu) -> hiển thị Modal nhập họ và tên
+      if (!dbFullName) {
         setUserAccessToken(accessToken);
         setStatus(STATUS.NEED_NAME);
       } else {
-        toast.success(`Đăng nhập thành công! Chào mừng, ${savedFullName}! 🎉`);
+        toast.success(`Đăng nhập thành công! Chào mừng, ${dbFullName}! 🎉`);
         setStatus(STATUS.DONE);
         navigate('/', { replace: true });
       }

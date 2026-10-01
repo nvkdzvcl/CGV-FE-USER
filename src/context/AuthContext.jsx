@@ -8,7 +8,7 @@
 
 import React, { createContext, useState, useCallback, useEffect } from 'react';
 import { decodeJwtPayload } from '../services/authService';
-import { saveTokens, getTokens, saveUser, getSavedUser, clearSession } from '../services/userService';
+import { saveTokens, getTokens, saveUser, getSavedUser, clearSession, getMyProfile } from '../services/userService';
 import {
   logout as apiLogout,
   refreshToken as apiRefreshToken,
@@ -41,6 +41,24 @@ export function AuthProvider({ children }) {
   // Khởi tạo state từ localStorage
   const [tokens, setTokens] = useState(() => getTokens());
   const [currentUser, setCurrentUser] = useState(() => getSavedUser());
+
+  // Đồng bộ currentUser trực tiếp từ Database PostgreSQL khi có accessToken
+  useEffect(() => {
+    if (!tokens?.accessToken) return;
+    getMyProfile(tokens.accessToken)
+      .then((dbUser) => {
+        if (dbUser && dbUser.fullName) {
+          setCurrentUser((prev) => {
+            const updated = buildUserObject({ ...prev, ...dbUser });
+            saveUser(updated);
+            return updated;
+          });
+        }
+      })
+      .catch(() => {
+        // Giữ nguyên thông tin local nếu DB tạm thời không phản hồi
+      });
+  }, [tokens?.accessToken]);
 
   // Đồng bộ tokens và session qua Custom Events và localStorage storage event giữa các tabs
   useEffect(() => {

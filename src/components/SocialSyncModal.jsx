@@ -10,7 +10,7 @@ import { User, X, Sparkles } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import toast from '../services/toastService';
 
-import { socialSync, removeVietnameseDiacritics } from '../services/authService';
+import { socialSync } from '../services/authService';
 
 /**
  * @param {{ accessToken: string, onSuccess?: (user: any) => void, onClose: () => void }} props
@@ -30,17 +30,16 @@ export default function SocialSyncModal({ accessToken, onSuccess, onClose }) {
 
     setLoading(true);
     try {
-      const cleanName = removeVietnameseDiacritics(name);
-      // Gọi backend để lưu fullName vào DB cho tài khoản này
-      const updatedUser = await socialSync(accessToken, cleanName);
+      // Lưu đúng họ tên người dùng nhập vào DB
+      const updatedUser = await socialSync(accessToken, name);
 
       // Cập nhật auth state trong frontend
       updateUser({
         ...currentUser,
-        fullName: updatedUser?.fullName || cleanName,
+        fullName: updatedUser?.fullName || name,
       });
 
-      toast.success(`Chào mừng, ${updatedUser?.fullName || cleanName}! Đăng nhập thành công! 🎉`);
+      toast.success(`Chào mừng, ${updatedUser?.fullName || name}! Đăng nhập thành công! 🎉`);
       if (onSuccess) {
         onSuccess(updatedUser);
       } else {
