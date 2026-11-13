@@ -1,6 +1,6 @@
 /**
  * SocialSyncModal.jsx
- * Modal hiện ra sau khi đăng nhập Google/Facebook thành công.
+ * Modal hiện ra sau khi đăng nhập Google thành công.
  * Nếu user chưa có fullName trong JWT, yêu cầu nhập.
  * Sau khi submit, gọi updateUser để cập nhật state.
  */

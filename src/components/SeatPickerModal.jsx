@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { X, Clock, Check, Tag, ChevronDown, ChevronUp, Ticket, Gift, AlertCircle, Info } from 'lucide-react';
-import { ApiService, getSessionId } from '../services/api';
+import { ApiService } from '../services/api';
 import { realtime, REALTIME_EVENTS } from '../services/realtimeService';
 import { useSeatSocket } from '../hooks/useSeatSocket';
 import { useAuth } from '../hooks/useAuth';
@@ -45,12 +45,15 @@ function generateDefaultSeats(basePrice = 85000, surcharges = {}, rows = DEFAULT
   return map;
 }
 
-export default function SeatPickerModal({ bookingContext, onClose, onBookingSuccess, onOpenAuth }) {
+export default function SeatPickerModal({ bookingContext, onClose, onBookingSuccess, onOpenAuth, seatReleaseRef }) {
   const { currentUser } = useAuth();
-  const sessionId = getSessionId();
-  const currentUserId = currentUser?.id || sessionId;
+  const currentUserId = currentUser?.id;
   const [activeShowtime, setActiveShowtime] = useState(bookingContext?.showtime || null);
   const showtimeId = activeShowtime?.id || bookingContext?.showtime?.id || bookingContext?.showtimeId;
+  const [pendingCheckout, setPendingCheckout] = useState(null);
+  const pendingCheckoutRef = useRef(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(true);
+  const [checkoutError, setCheckoutError] = useState('');
 
   // Base price from showtime
   const basePrice = Number(
@@ -68,25 +71,23 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   const [seats, setSeats] = useState(() => generateDefaultSeats(basePrice, { NORMAL: 0, VIP: 15000, SWEETBOX: 30000 }, DEFAULT_ROWS, DEFAULT_COLS));
   const [isLoadingSeats, setIsLoadingSeats] = useState(true);
+  const [seatLoadError, setSeatLoadError] = useState(null);
+  const [seatLoadRetry, setSeatLoadRetry] = useState(0);
   const [isMaintenanceRoom, setIsMaintenanceRoom] = useState(false);
-  const [selectedSeatIds, setSelectedSeatIds] = useState(() => {
-    try {
-      if (!showtimeId) return [];
-      const saved = localStorage.getItem(`cgv_selected_seats_${showtimeId}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [selectedSeatIds, setSelectedSeatIds] = useState([]);
 
   useEffect(() => {
-    if (!showtimeId) return;
-    if (selectedSeatIds.length > 0) {
-      localStorage.setItem(`cgv_selected_seats_${showtimeId}`, JSON.stringify(selectedSeatIds));
-    } else {
-      localStorage.removeItem(`cgv_selected_seats_${showtimeId}`);
+    if (showtimeId) localStorage.removeItem(`cgv_selected_seats_${showtimeId}`);
+    setSelectedSeatIds([]);
+  }, [showtimeId]);
+  const previousAccountRef = useRef(currentUser?.id);
+  useEffect(() => {
+    if (previousAccountRef.current && previousAccountRef.current !== currentUser?.id) {
+      setSelectedSeatIds([]);
+      setSeatLoadRetry(attempt => attempt + 1);
     }
-  }, [selectedSeatIds, showtimeId]);
+    previousAccountRef.current = currentUser?.id;
+  }, [currentUser?.id]);
   const [timeLeft, setTimeLeft] = useState(240); // Phase 1: 4 phút (240s) giữ ghế
   const [showIdleWarning, setShowIdleWarning] = useState(false);
   const [idleCountdown, setIdleCountdown] = useState(15);
@@ -102,16 +103,43 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [successOrder, setSuccessOrder] = useState(null);
+  const [checkoutNotice, setCheckoutNotice] = useState(null);
 
-  // Guest booking contact state
-  const [showGuestForm, setShowGuestForm] = useState(false);
-  const [guestName, setGuestName] = useState('');
-  const [guestEmail, setGuestEmail] = useState('');
-  const [guestPhone, setGuestPhone] = useState('');
-  const [guestFormError, setGuestFormError] = useState('');
+  useEffect(() => {
+    if (!currentUser?.id || !showtimeId) {
+      setPendingCheckout(null);
+      setCheckoutLoading(false);
+      return;
+    }
+    let active = true;
+    pendingCheckoutRef.current = null;
+    setPendingCheckout(null);
+    setCheckoutError('');
+    const checkBooking = async () => {
+      try {
+        const booking = await ApiService.getMyPendingBooking(showtimeId);
+        if (!active) return;
+        const previous = pendingCheckoutRef.current;
+        if (previous && !booking) {
+          setCheckoutNotice({ showtimeId, bookingId: previous.bookingId, status: 'ENDED' });
+          setSeatLoadRetry(attempt => attempt + 1);
+        }
+        pendingCheckoutRef.current = booking;
+        setPendingCheckout(booking);
+        setCheckoutError('');
+      } catch (err) {
+        if (active) setCheckoutError('Không kiểm tra được đơn chờ thanh toán. Vui lòng thử lại trước khi chọn ghế.');
+      } finally {
+        if (active) setCheckoutLoading(false);
+      }
+    };
+    setCheckoutLoading(true);
+    checkBooking();
+    const timer = setInterval(checkBooking, 30000);
+    return () => { active = false; clearInterval(timer); };
+  }, [currentUser?.id, showtimeId]);
 
   const userTier = useMemo(() => {
-    if (!currentUser) return 'GUEST';
     const raw = currentUser?.membershipTier?.code
       || currentUser?.membershipTier
       || currentUser?.membership_tier
@@ -215,28 +243,11 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     ApiService.getAvailableVouchers(rawTotal, userTier)
       .then(list => {
         if (Array.isArray(list)) {
-          if (!currentUser) {
-            // Khách vãng lai: chỉ áp dụng voucher cho tất cả (applicableTier == null hoặc ALL)
-            setAvailableVouchers(list.filter(v => !v.applicableTier || v.applicableTier === 'ALL'));
-          } else {
-            setAvailableVouchers(list);
-          }
+          setAvailableVouchers(list);
         }
       })
       .catch(err => console.warn('Lỗi tải voucher khả dụng:', err));
   }, [rawTotal, userTier, currentUser]);
-
-  // Khi khách vãng lai đăng nhập thành công tài khoản, tự động chuyển giao quyền giữ các ghế đã chọn sang account
-  useEffect(() => {
-    if (currentUser?.id && selectedSeatIds.length > 0 && showtimeId && showtimeId.length === 36) {
-      const seatDbIds = selectedSeatIds.map(id => seats[id]?.dbId).filter(id => id && id.length === 36);
-      if (seatDbIds.length > 0) {
-        ApiService.transferSeatLocks(showtimeId, seatDbIds, sessionId).catch(err => {
-          console.warn('Lỗi transfer seat lock khi login:', err);
-        });
-      }
-    }
-  }, [currentUser?.id]);
 
   // Realtime WebSocket for seat lock events
   const handleSocketSeatEvent = useCallback((event) => {
@@ -248,8 +259,8 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
         const seatKey = Object.keys(updated).find(k => updated[k]?.dbId === targetId || k === targetId);
         if (!seatKey || !updated[seatKey]) return;
         if (event.type === 'LOCK') {
-          const isMyLock = event.userId === currentUserId || event.userId === sessionId;
-          if (!isMyLock) {
+          const isMyLock = event.userId === currentUserId;
+          if (!isMyLock && !selectedSeatIds.includes(seatKey)) {
             updated[seatKey] = { ...updated[seatKey], status: 'holding' };
             changed = true;
           }
@@ -265,7 +276,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       });
       return changed ? updated : prevSeats;
     });
-  }, [currentUserId, sessionId]);
+  }, [currentUserId, selectedSeatIds]);
 
   const { isConnected: isSocketConnected } = useSeatSocket(showtimeId, handleSocketSeatEvent);
 
@@ -306,55 +317,61 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   // 4. Resolve roomId & Load real seats from DB by roomId with API-driven prices
   useEffect(() => {
+    let isMounted = true;
+    setSeatLoadError(null);
+    setIsLoadingSeats(true);
     if (!currentRoomId && showtimeId && showtimeId.length === 36) {
       ApiService.getShowtimeById(showtimeId)
         .then(st => {
+          if (!isMounted) return;
           if (st) setActiveShowtime(st);
+          else throw new Error('Không tìm thấy suất chiếu.');
         })
         .catch(err => {
+          if (!isMounted) return;
           console.warn('Không thể tải chi tiết showtime:', err);
+          setSeatLoadError(err.message);
           setIsLoadingSeats(false);
         });
-      return;
+      return () => { isMounted = false; };
     }
 
     if (!currentRoomId) {
+      setSeatLoadError('Không xác định được phòng chiếu.');
       setIsLoadingSeats(false);
       return;
     }
 
-    let isMounted = true;
-    setIsLoadingSeats(true);
+    if (!showtimeId || showtimeId.length !== 36) {
+      setSeatLoadError('Chưa xác định được suất chiếu hợp lệ.');
+      setIsLoadingSeats(false);
+      return;
+    }
 
-    // Timeout an toàn 1.2s: tự động gỡ overlay loading nếu backend có độ trễ, cho phép người dùng tương tác ngay
-    const safetyTimer = setTimeout(() => {
-      if (isMounted) setIsLoadingSeats(false);
-    }, 1200);
-
-    Promise.allSettled([
+    Promise.all([
       ApiService.getSeatsByRoomId(currentRoomId),
-      showtimeId && showtimeId.length === 36 ? ApiService.getBookedSeats(showtimeId) : Promise.resolve([]),
-      showtimeId && showtimeId.length === 36 ? ApiService.getActiveSeatLocks(showtimeId) : Promise.resolve([])
+      ApiService.getBookedSeats(showtimeId),
+      ApiService.getActiveSeatLocks(showtimeId)
     ]).then(([seatsRes, bookedRes, locksRes]) => {
       if (!isMounted) return;
 
-      const roomSeats = seatsRes.status === 'fulfilled'
-        ? (Array.isArray(seatsRes.value) ? seatsRes.value : (seatsRes.value?.data || []))
-        : [];
+      const roomSeats = Array.isArray(seatsRes) ? seatsRes : (seatsRes?.data || []);
 
       if (roomSeats.length === 0) {
-        setIsLoadingSeats(false);
-        return;
+        throw new Error('Phòng chiếu chưa có dữ liệu ghế.');
       }
 
-      const rawBooked = bookedRes.status === 'fulfilled'
-        ? (Array.isArray(bookedRes.value) ? bookedRes.value : (bookedRes.value?.data || []))
-        : [];
+      if (!Array.isArray(bookedRes) || !Array.isArray(locksRes)) {
+        throw new Error('Máy chủ không trả trạng thái ghế hợp lệ.');
+      }
+      const rawBooked = bookedRes;
       const bookedSet = new Set(rawBooked.map(String));
+      setSelectedSeatIds(current => current.filter(id => {
+        const seat = roomSeats.find(item => `${item.rowChar}${item.seatNumber}` === id);
+        return seat && seat.isActive !== false && !bookedSet.has(String(seat.id));
+      }));
 
-      const rawLocks = locksRes.status === 'fulfilled'
-        ? (Array.isArray(locksRes.value) ? locksRes.value : (locksRes.value?.data || []))
-        : [];
+      const rawLocks = locksRes;
       const locksSet = new Set(rawLocks.map(String));
 
       // Trích xuất hàng và số cột chuẩn xác trực tiếp từ Database BE
@@ -407,16 +424,15 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       });
     }).catch(err => {
       console.error('Lỗi khi tải sơ đồ ghế:', err);
+      if (isMounted) setSeatLoadError(err.message);
     }).finally(() => {
-      clearTimeout(safetyTimer);
       if (isMounted) setIsLoadingSeats(false);
     });
 
     return () => {
       isMounted = false;
-      clearTimeout(safetyTimer);
     };
-  }, [activeShowtime, bookingContext, basePrice, seatTypeSurcharges, showtimeId]);
+  }, [activeShowtime, bookingContext, basePrice, seatTypeSurcharges, showtimeId, seatLoadRetry]);
 
   const selectedSeatIdsRef = useRef(selectedSeatIds);
   const seatsRef = useRef(seats);
@@ -428,13 +444,26 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     seatsRef.current = seats;
     showtimeIdRef.current = showtimeId;
     successOrderRef.current = successOrder;
-  }, [selectedSeatIds, seats, showtimeId, successOrder]);
+    pendingCheckoutRef.current = pendingCheckout;
+  }, [selectedSeatIds, seats, showtimeId, successOrder, pendingCheckout]);
+
+  useEffect(() => {
+    if (!seatReleaseRef) return;
+    seatReleaseRef.current = async () => {
+      if (pendingCheckoutRef.current) return;
+      const dbIds = selectedSeatIdsRef.current.map(id => seatsRef.current[id]?.dbId).filter(Boolean);
+      if (!dbIds.length) return;
+      await ApiService.releaseSeats(showtimeIdRef.current, dbIds, AbortSignal.timeout(3000));
+      selectedSeatIdsRef.current = [];
+    };
+    return () => { seatReleaseRef.current = null; };
+  }, [seatReleaseRef]);
 
   // Giải phóng toàn bộ ghế ngay lập tức khi người dùng thoát hoặc đóng màn hình
   useEffect(() => {
     return () => {
       // Nếu đang chuyển hướng sang VNPay thì KHÔNG release ghế
-      if (sessionStorage.getItem('cgv_active_checkout')) return;
+      if (pendingCheckoutRef.current) return;
 
       if (!successOrderRef.current && selectedSeatIdsRef.current.length > 0 && showtimeIdRef.current && showtimeIdRef.current.length === 36) {
         const dbIds = selectedSeatIdsRef.current
@@ -448,23 +477,16 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   }, []);
 
   const handleCloseModal = useCallback(() => {
+    const hasActiveCheckout = Boolean(pendingCheckout);
     if (showtimeId) {
-      try {
-        localStorage.removeItem(`cgv_selected_seats_${showtimeId}`);
-        const activeCheckoutStr = sessionStorage.getItem('cgv_active_checkout');
-        if (activeCheckoutStr) {
-          const chk = JSON.parse(activeCheckoutStr);
-          if (chk?.bookingId) ApiService.cancelBooking(chk.bookingId).catch(() => {});
-          sessionStorage.removeItem('cgv_active_checkout');
-        }
-      } catch {}
+      localStorage.removeItem(`cgv_selected_seats_${showtimeId}`);
     }
-    if (selectedSeatIds.length > 0 && !successOrder && showtimeId && showtimeId.length === 36) {
+    if (selectedSeatIds.length > 0 && !successOrder && !hasActiveCheckout && showtimeId && showtimeId.length === 36) {
       const dbIds = selectedSeatIds.map(id => seats[id]?.dbId).filter(id => id && id.length === 36);
       if (dbIds.length > 0) ApiService.releaseSeats(showtimeId, dbIds).catch(() => {});
     }
     onClose();
-  }, [selectedSeatIds, successOrder, showtimeId, seats, onClose]);
+  }, [selectedSeatIds, successOrder, showtimeId, seats, onClose, pendingCheckout]);
 
   // ─── User Activity & Heartbeat / Idle Monitor ───
   const resetUserActivity = useCallback(() => {
@@ -486,7 +508,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   // Idle check timer: cảnh báo 15s nếu đứng yên 75s
   useEffect(() => {
-    if (selectedSeatIds.length === 0 || isCheckingOut || successOrder) {
+    if (selectedSeatIds.length === 0 || isCheckingOut || successOrder || pendingCheckout) {
       if (showIdleWarning) setShowIdleWarning(false);
       return;
     }
@@ -518,10 +540,15 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     }, 1000);
 
     return () => clearInterval(idleTimer);
-  }, [selectedSeatIds, isCheckingOut, successOrder, showIdleWarning, seats, showtimeId, onClose]);
+  }, [selectedSeatIds, isCheckingOut, successOrder, pendingCheckout, showIdleWarning, seats, showtimeId, onClose]);
 
   // Countdown timer Phase 1 (4 minutes - 240s)
   useEffect(() => {
+    if (pendingCheckout) return;
+    if (selectedSeatIds.length === 0) {
+      setTimeLeft(240);
+      return;
+    }
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -541,7 +568,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [handleCloseModal, selectedSeatIds, showtimeId, seats]);
+  }, [handleCloseModal, selectedSeatIds, showtimeId, seats, pendingCheckout]);
 
   const formatTimer = (secs) => {
     const m = Math.floor(secs / 60);
@@ -572,7 +599,16 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   // ─── Seat click handler ───
   const toggleSeat = async (id) => {
-    if (isLoadingSeats) return;
+    if (!currentUser) {
+      onOpenAuth?.('login');
+      return;
+    }
+    if (checkoutLoading || checkoutError) return;
+    if (pendingCheckout) {
+      alert('Ghế của đơn cũ đang chờ VNPay. Hãy tiếp tục hoặc đối soát đơn cũ, không chọn lại ghế.');
+      return;
+    }
+    if (isLoadingSeats || seatLoadError) return;
     if (isMaintenanceRoom) {
       alert('Phòng chiếu này hiện đang được bảo trì kỹ thuật. Quý khách vui lòng chọn phòng khác!');
       return;
@@ -589,9 +625,8 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
     // Nếu ghế chưa chọn: kiểm tra xem ghế đã bị người khác mua hoặc giữ chưa
     if (!isSelected) {
-      if (seat.status === 'booked' || seat.status === 'holding') {
-        return;
-      }
+      if (seat.status === 'booked') return;
+      if (seat.status === 'holding') return;
     }
 
     const seatDbId = seat.dbId;
@@ -698,7 +733,47 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
   };
 
   // ─── Checkout & VNPay Payment Flow ───
+  const resumeActiveCheckout = async () => {
+    setIsCheckingOut(true);
+    try {
+      const booking = await ApiService.getMyPendingBooking(showtimeId);
+      pendingCheckoutRef.current = booking;
+      setPendingCheckout(booking);
+      setCheckoutError('');
+      if (!booking) {
+        return false;
+      }
+      if (booking.status !== 'PAYMENT_PENDING' || !booking.paymentDeadline || Date.parse(booking.paymentDeadline) <= Date.now()) {
+        throw new Error('Đơn trước đã hết hạn hoặc không còn chờ thanh toán. Kiểm tra trạng thái giao dịch, không đặt lại cùng ghế.');
+      }
+      try {
+        await ApiService.getPaymentStatus(booking.bookingId);
+        throw new Error('Đơn đã có giao dịch VNPay. Vui lòng kiểm tra kết quả trong lịch sử vé hoặc liên hệ hỗ trợ.');
+      } catch (error) {
+        if (error.status !== 404) throw error;
+      }
+      const url = await ApiService.createVnpayPaymentUrl(booking.bookingId, booking.finalAmount);
+      if (!url?.startsWith('http')) throw new Error('Không lấy được đường dẫn thanh toán.');
+      window.location.href = url;
+    } catch (err) {
+      setCheckoutError(err.message || 'Không kiểm tra được đơn chờ thanh toán. Vui lòng tải lại trang.');
+      alert(err.message || 'Không thể tiếp tục đơn đang thanh toán. Vui lòng liên hệ hỗ trợ.');
+    } finally {
+      setIsCheckingOut(false);
+    }
+    return true;
+  };
+
   const handleCheckout = () => {
+    if (!currentUser) {
+      onOpenAuth?.('login');
+      return;
+    }
+    if (checkoutLoading || checkoutError) return;
+    if (pendingCheckout) {
+      resumeActiveCheckout();
+      return;
+    }
     if (isMaintenanceRoom) {
       alert('Phòng chiếu này hiện đang được bảo trì kỹ thuật, tạm ngưng nhận đặt vé. Quý khách vui lòng chọn phòng hoặc suất chiếu khác!');
       return;
@@ -709,41 +784,11 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       return;
     }
 
-    if (!currentUser) {
-      // Khách vãng lai: Bắt buộc điền form thông tin trước khi thanh toán
-      setShowGuestForm(true);
-      return;
-    }
-
-    proceedCheckout(null);
+    proceedCheckout();
   };
 
-  const handleGuestSubmit = (e) => {
-    e.preventDefault();
-    if (!guestName.trim()) {
-      setGuestFormError('Vui lòng nhập họ và tên của bạn.');
-      return;
-    }
-    const cleanPhone = guestPhone.trim();
-    if (!cleanPhone || !/^(0|\+84)[3|5|7|8|9][0-9]{8}$/.test(cleanPhone)) {
-      setGuestFormError('Số điện thoại không hợp lệ (10 chữ số, ví dụ: 0912345678).');
-      return;
-    }
-    const cleanEmail = guestEmail.trim();
-    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      setGuestFormError('Email nhận vé không hợp lệ.');
-      return;
-    }
-    setGuestFormError('');
-    setShowGuestForm(false);
-    proceedCheckout({
-      guestName: guestName.trim(),
-      guestEmail: cleanEmail,
-      guestPhone: cleanPhone
-    });
-  };
-
-  const proceedCheckout = async (guestData = null) => {
+  const proceedCheckout = async () => {
+    if (await resumeActiveCheckout()) return;
     const targetShowtimeId = showtimeId;
     if (!targetShowtimeId || targetShowtimeId.length !== 36) {
       alert('Chưa có thông tin suất chiếu hợp lệ (UUID). Vui lòng chọn lại suất chiếu!');
@@ -779,101 +824,34 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
     setIsCheckingOut(true);
     let createdBookingId = null;
     try {
-      // 1. Kiểm tra nếu có đơn vé pending checkout sẵn cho đúng suất chiếu này (ví dụ quay lại từ VNPay để tiếp tục thanh toán)
-      let realBookingId = null;
-      let bookingRes = null;
-      let amountToPay = finalTotal;
+      const bookingPayload = {
+        showtimeId: targetShowtimeId,
+        seatIds: seatDbIds,
+        promotionId: appliedVoucher?.voucher?.id || null
+      };
 
-      const activeCheckoutStr = sessionStorage.getItem('cgv_active_checkout');
-      if (activeCheckoutStr) {
-        try {
-          const prevCheckout = JSON.parse(activeCheckoutStr);
-          const isSameShowtime = prevCheckout?.showtimeId === targetShowtimeId;
-          const isRecent = prevCheckout?.timestamp && (Date.now() - prevCheckout.timestamp < 9 * 60 * 1000);
-          if (isSameShowtime && isRecent && prevCheckout?.bookingId) {
-            realBookingId = prevCheckout.bookingId;
-            amountToPay = prevCheckout.amountToPay || finalTotal;
-          }
-        } catch {}
-      }
-
-      if (!realBookingId) {
-        // Tạo đơn booking mới (hỗ trợ cả khách đã đăng nhập và khách vãng lai)
-        const bookingPayload = {
-          showtimeId: targetShowtimeId,
-          seatIds: seatDbIds,
-          promotionId: appliedVoucher?.voucher?.id || null,
-          guestSessionId: sessionId
-        };
-
-        if (!currentUser && guestData) {
-          bookingPayload.guestName = guestData.guestName;
-          bookingPayload.guestEmail = guestData.guestEmail;
-          bookingPayload.guestPhone = guestData.guestPhone;
-        }
-
-        bookingRes = await ApiService.createBooking(bookingPayload);
-
-        realBookingId = bookingRes?.id || bookingRes?.bookingId;
-        if (!realBookingId) {
-          throw new Error('Không nhận được mã đặt vé từ máy chủ.');
-        }
-        amountToPay = bookingRes?.finalAmount || finalTotal;
-      }
+      const bookingRes = await ApiService.createBooking(bookingPayload);
+      const realBookingId = bookingRes?.id || bookingRes?.bookingId;
+      if (!realBookingId) throw new Error('Không nhận được mã đặt vé từ máy chủ.');
+      const amountToPay = bookingRes?.finalAmount || finalTotal;
       createdBookingId = realBookingId;
-
-      // Lưu vé khách vãng lai vào localStorage để tra cứu lịch sử tự động
-      if (!currentUser && guestData) {
-        try {
-          const guestBookingItem = {
-            id: realBookingId,
-            showtimeId: targetShowtimeId,
-            movieTitle: activeShowtime?.movieTitle || bookingContext?.movieTitle || 'Phim CGV',
-            cinemaName: activeShowtime?.cinemaName || bookingContext?.cinemaName || 'CGV Cinema',
-            roomName: activeShowtime?.roomName || 'Phòng chiếu',
-            startTime: activeShowtime?.startTime || new Date().toISOString(),
-            seatNames: selectedSeatIds,
-            totalAmount: amountToPay,
-            guestName: guestData.guestName,
-            guestEmail: guestData.guestEmail,
-            guestPhone: guestData.guestPhone,
-            createdAt: new Date().toISOString(),
-            status: 'PENDING'
-          };
-          const existing = JSON.parse(localStorage.getItem('cgv_guest_bookings') || '[]');
-          localStorage.setItem('cgv_guest_bookings', JSON.stringify([guestBookingItem, ...existing.filter(b => b.id !== realBookingId)].slice(0, 30)));
-        } catch (e) {
-          console.warn('Lỗi lưu lịch sử vé khách vãng lai:', e);
-        }
-      }
 
       // 2. Tạo link thanh toán VNPay
       const vnpayUrl = await ApiService.createVnpayPaymentUrl(realBookingId, amountToPay);
 
       if (vnpayUrl && typeof vnpayUrl === 'string' && vnpayUrl.startsWith('http')) {
-        sessionStorage.setItem('cgv_active_checkout', JSON.stringify({
-          bookingId: realBookingId,
-          showtimeId: targetShowtimeId,
-          amountToPay,
-          timestamp: Date.now()
-        }));
+        pendingCheckoutRef.current = bookingRes;
+        localStorage.removeItem(`cgv_selected_seats_${targetShowtimeId}`);
         window.location.href = vnpayUrl;
         return;
       }
 
-      setSuccessOrder(bookingRes);
-      if (onBookingSuccess) onBookingSuccess(bookingRes);
+      throw new Error('Không nhận được URL VNPay. Kiểm tra trạng thái giao dịch trước khi thử lại.');
     } catch (err) {
       console.error('Checkout error:', err);
-      // Tự động hủy đơn booking và nhả ghế ngay nếu có lỗi xảy ra ở bước thanh toán để không treo PENDING
-      if (createdBookingId) {
-        try {
-          await ApiService.cancelBooking(createdBookingId);
-        } catch (cErr) {
-          console.warn('Lỗi khi hủy booking dang dở:', cErr);
-        }
-      }
-      alert(err.message || 'Không thể tạo đơn đặt vé lúc này. Vui lòng thử lại.');
+      alert(createdBookingId
+        ? 'Đơn đã được tạo nhưng chưa rõ kết quả tạo giao dịch. Kiểm tra lịch sử vé trước khi thao tác tiếp.'
+        : (err.message || 'Không thể tạo đơn đặt vé lúc này. Vui lòng thử lại.'));
     } finally {
       setIsCheckingOut(false);
     }
@@ -881,7 +859,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
   const movieTitle = bookingContext?.movie?.title || bookingContext?.movie?.movieTitle || 'CGV Cinema';
   const cinemaName = bookingContext?.cinema?.name || bookingContext?.cinema?.cinemaName || 'CGV Cinema';
-  const ageRating = bookingContext?.movie?.ageRating || 'P';
+  const ageRating = bookingContext?.movie?.ageRating;
 
   return (
     <div className="modal-backdrop seat-booking-backdrop" onClick={handleCloseModal}>
@@ -903,10 +881,17 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
           </div>
 
           <div className="seat-modal-actions">
-            <div className="seat-holding-timer" title="Thời gian giữ ghế">
-              <Clock size={13} />
-              <span>{formatTimer(timeLeft)}</span>
-            </div>
+            {pendingCheckout ? (
+              <div className="seat-holding-timer" title="Đơn cần kiểm tra trạng thái trên máy chủ">
+                <Clock size={13} />
+                <span>Đơn VNPay</span>
+              </div>
+            ) : (
+              <div className="seat-holding-timer" title="Thời gian giữ ghế tạm">
+                <Clock size={13} />
+                <span>{formatTimer(timeLeft)}</span>
+              </div>
+            )}
             <button
               className="seat-modal-close"
               onClick={handleCloseModal}
@@ -994,6 +979,12 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
 
             {/* Seat Map - Always visible */}
             <div className="seats-container" style={{ position: 'relative' }}>
+              {seatLoadError && !isLoadingSeats && (
+                <div role="alert" style={{ padding: 24, color: '#fca5a5' }}>
+                  Không tải được trạng thái ghế: {seatLoadError}
+                  <button type="button" onClick={() => setSeatLoadRetry(value => value + 1)}>Thử lại</button>
+                </div>
+              )}
               {isLoadingSeats && (
                 <div style={{
                   position: 'absolute',
@@ -1018,7 +1009,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
               )}
               <div 
                 className="seat-map-grid"
-                style={isLoadingSeats ? { opacity: 0.25, pointerEvents: 'none', filter: 'grayscale(0.8)' } : { transition: 'opacity 0.25s ease, filter 0.25s ease' }}
+                style={isLoadingSeats || seatLoadError ? { opacity: 0.25, pointerEvents: 'none', filter: 'grayscale(0.8)' } : { transition: 'opacity 0.25s ease, filter 0.25s ease' }}
               >
                 {gridRows.map(row => {
                   const isSweetboxRow = row === 'H';
@@ -1091,15 +1082,25 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
               {/* Left: Seat info & Dynamic Breakdown */}
               <div className="checkout-info">
                 <div className="checkout-seats-list">
-                  {selectedSeatIds.length > 0
+                  {pendingCheckout ? `Kiểm tra đơn VNPay: ${pendingCheckout.bookingId}` : selectedSeatIds.length > 0
                     ? `Ghế (${selectedSeatIds.length}): ${selectedSeatIds.join(', ')}`
                     : 'Chưa chọn ghế nào'}
                 </div>
+                {checkoutError && <div role="alert" style={{ color: '#fbbf24', fontSize: '0.82rem' }}>
+                  {checkoutError} <button type="button" onClick={() => window.location.reload()} style={{ color: 'inherit' }}>Tải lại trang để kiểm tra đơn</button>
+                </div>}
+                {checkoutNotice?.showtimeId === showtimeId && (
+                  <div role="alert" style={{ color: '#fbbf24', fontSize: '0.82rem' }}>
+                    {checkoutNotice.status === 'ENDED'
+                      ? `Đơn ${checkoutNotice.bookingId} đã hủy/hoàn. Đã tải lại ghế; nếu đã mở VNPay hoặc thấy trừ tiền, giữ mã đơn để đối soát trước khi mua lại.`
+                      : `Đơn ${checkoutNotice.bookingId} đã xác nhận. Vé thuộc đơn cũ; không thanh toán lại cùng ghế.`}
+                  </div>
+                )}
 
                 <div className="checkout-breakdown-desktop" style={{ marginTop: 4, fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <div style={{ color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
                     <span>Giá gốc:</span>
-                    <span style={{ fontWeight: 600 }}>{formatVnd(rawTotal)}</span>
+                    <span style={{ fontWeight: 600 }}>{formatVnd(pendingCheckout ? pendingCheckout.finalAmount : rawTotal)}</span>
                   </div>
                   {appliedVoucher && (
                     <div style={{ color: '#10b981', display: 'flex', justifyContent: 'space-between', gap: 16 }}>
@@ -1113,7 +1114,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
                     borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 4, marginTop: 2
                   }}>
                     <span>Thành tiền:</span>
-                    <span style={{ color: appliedVoucher ? '#10b981' : '#fff' }}>{formatVnd(finalTotal)}</span>
+                    <span style={{ color: appliedVoucher ? '#10b981' : '#fff' }}>{formatVnd(pendingCheckout ? pendingCheckout.finalAmount : finalTotal)}</span>
                   </div>
                 </div>
 
@@ -1121,7 +1122,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
                 <div className="checkout-mobile-total">
                   <span className="checkout-mobile-label">Tổng:</span>
                   <span className={`checkout-mobile-val ${appliedVoucher ? 'has-discount' : ''}`}>
-                    {formatVnd(finalTotal)}
+                    {formatVnd(pendingCheckout ? pendingCheckout.finalAmount : finalTotal)}
                   </span>
                   {appliedVoucher && (
                     <span className="checkout-mobile-discount">(-{formatVnd(discountAmount)})</span>
@@ -1353,17 +1354,17 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
               {/* Right: Submit Button */}
               <button
                 className="btn-primary checkout-submit-btn"
-                disabled={selectedSeatIds.length === 0 || isCheckingOut || isMaintenanceRoom}
+                disabled={(!pendingCheckout && selectedSeatIds.length === 0) || isCheckingOut || checkoutLoading || !!checkoutError || (!pendingCheckout && isMaintenanceRoom) || isLoadingSeats || !!seatLoadError}
                 onClick={handleCheckout}
                 style={{
-                  opacity: (selectedSeatIds.length === 0 || isMaintenanceRoom) ? 0.5 : 1,
+                  opacity: ((!pendingCheckout && selectedSeatIds.length === 0) || isMaintenanceRoom) ? 0.5 : 1,
                   display: 'flex', alignItems: 'center', gap: 8,
                   whiteSpace: 'nowrap', padding: '12px 22px', fontSize: '0.92rem',
                   cursor: isMaintenanceRoom ? 'not-allowed' : 'pointer'
                 }}
               >
                 <Ticket size={16} />
-                {isMaintenanceRoom ? 'Phòng đang bảo trì' : (isCheckingOut ? 'Đang khởi tạo VNPay...' : 'Thanh toán VNPay')}
+                {isMaintenanceRoom ? 'Phòng đang bảo trì' : (isCheckingOut || checkoutLoading ? 'Đang kiểm tra đơn...' : pendingCheckout ? 'Tiếp tục đơn cũ' : 'Thanh toán VNPay')}
               </button>
             </div>
           </>
@@ -1395,177 +1396,6 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
         </div>
       )}
 
-      {/* Guest Contact Form Modal */}
-      {showGuestForm && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 140,
-            background: 'rgba(0, 0, 0, 0.78)',
-            backdropFilter: 'blur(5px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16
-          }}
-          onClick={() => setShowGuestForm(false)}
-        >
-          <div
-            style={{
-              background: '#121622',
-              border: '1px solid rgba(255, 255, 255, 0.16)',
-              borderRadius: 16,
-              maxWidth: 460,
-              width: '100%',
-              padding: 24,
-              boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
-              position: 'relative'
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
-                  background: 'rgba(231, 26, 15, 0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#e71a0f'
-                }}>
-                  <Ticket size={20} />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, color: '#fff', fontSize: '1.08rem', fontWeight: 700 }}>Thông tin nhận vé điện tử</h3>
-                  <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Dành cho khách đặt vé không cần đăng nhập</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGuestForm(false)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 4 }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {guestFormError && (
-              <div style={{
-                background: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-                padding: '8px 12px',
-                borderRadius: 8,
-                fontSize: '0.82rem',
-                marginBottom: 14
-              }}>
-                {guestFormError}
-              </div>
-            )}
-
-            <form onSubmit={handleGuestSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600, marginBottom: 6 }}>
-                  Họ và tên người nhận vé <span style={{ color: '#e71a0f' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ví dụ: Nguyễn Văn A"
-                  className="auth-input"
-                  value={guestName}
-                  onChange={e => setGuestName(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600, marginBottom: 6 }}>
-                  Số điện thoại <span style={{ color: '#e71a0f' }}>*</span> (dùng tra cứu vé & nhận SMS)
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="Ví dụ: 0912345678"
-                  className="auth-input"
-                  value={guestPhone}
-                  onChange={e => setGuestPhone(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600, marginBottom: 6 }}>
-                  Email nhận vé điện tử <span style={{ color: '#e71a0f' }}>*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="Ví dụ: email@gmail.com"
-                  className="auth-input"
-                  value={guestEmail}
-                  onChange={e => setGuestEmail(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', fontSize: '0.88rem' }}
-                />
-              </div>
-
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: 8,
-                padding: '10px 12px',
-                fontSize: '0.78rem',
-                color: '#94a3b8',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
-                <span>Có tài khoản CGV?</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowGuestForm(false);
-                    if (onOpenAuth) onOpenAuth('login');
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#e71a0f',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                    textDecoration: 'underline'
-                  }}
-                >
-                  Đăng nhập để tích điểm
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowGuestForm(false)}
-                  style={{ flex: 1, padding: '10px 16px', fontSize: '0.88rem' }}
-                >
-                  Quay lại
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  style={{ flex: 2, padding: '10px 16px', fontSize: '0.88rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                >
-                  <Ticket size={16} />
-                  Xác nhận & Thanh toán
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

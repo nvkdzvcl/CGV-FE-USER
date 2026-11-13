@@ -20,18 +20,23 @@ import { MOVIES, CINEMAS } from "../data/mockData";
 import { ApiService } from "../services/api";
 
 export default function HomePage({ onOpenBooking }) {
-  const [allMovies, setAllMovies] = useState(MOVIES);
+  const [allMovies, setAllMovies] = useState(import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true' ? MOVIES : []);
+  const [moviesError, setMoviesError] = useState(false);
   const [heroIdx, setHeroIdx] = useState(0);
   const [heroTrailerOpen, setHeroTrailerOpen] = useState(false);
 
   const loadMovies = () => {
     ApiService.getMovies()
       .then(res => {
-        if (Array.isArray(res) && res.length > 0) {
+        if (Array.isArray(res)) {
           setAllMovies(res);
+          setMoviesError(false);
         }
       })
-      .catch(err => console.warn('Could not load real movies from API:', err.message));
+      .catch(err => {
+        setMoviesError(true);
+        console.warn('Could not load real movies from API:', err.message);
+      });
   };
 
   useEffect(() => {
@@ -95,7 +100,8 @@ export default function HomePage({ onOpenBooking }) {
   return (
     <div className="home-page">
       {/* Hero Carousel Banner */}
-      <section className="hero-section">
+      {moviesError && <p role="alert">Không tải được phim từ máy chủ. <button type="button" onClick={loadMovies}>Thử lại</button></p>}
+      {allMovies.length > 0 && <section className="hero-section">
         <img
           src={currentHero.backdropUrl || currentHero.posterUrl}
           alt={currentHero.title}
@@ -173,7 +179,7 @@ export default function HomePage({ onOpenBooking }) {
             />
           ))}
         </div>
-      </section>
+      </section>}
 
       {/* Quick Booking Bar */}
       <QuickBooking onSelectBooking={onOpenBooking} />
