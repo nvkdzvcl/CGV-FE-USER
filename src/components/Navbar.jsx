@@ -3,12 +3,10 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { Search, Film, User, Crown, Lock, Share2, LogOut, Menu, X, Loader2, Ticket } from "lucide-react";
 import { ApiService } from "../services/api";
 import CgvAuraLoader from "./CgvAuraLoader";
-import GuestTicketLookupModal from "./GuestTicketLookupModal";
 
 export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showGuestLookup, setShowGuestLookup] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -472,31 +470,6 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
             >
               Thành viên & Điểm
             </NavLink>
-            <button
-              type="button"
-              className="mobile-nav-link"
-              style={{
-                background: 'none',
-                border: 'none',
-                textAlign: 'left',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                cursor: 'pointer',
-                width: '100%',
-                color: '#f8fafc',
-                padding: '12px 16px',
-                fontSize: '0.95rem',
-                fontWeight: 500
-              }}
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setShowGuestLookup(true);
-              }}
-            >
-              <Ticket size={18} style={{ color: '#e71a0f' }} />
-              <span>Tra cứu vé đặt</span>
-            </button>
           </div>
 
           <div className="mobile-drawer-footer">
@@ -557,11 +530,6 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
         </div>
       )}
 
-      {/* Guest & Staff Ticket Lookup Modal */}
-      <GuestTicketLookupModal
-        isOpen={showGuestLookup}
-        onClose={() => setShowGuestLookup(false)}
-      />
     </nav>
   );
 }

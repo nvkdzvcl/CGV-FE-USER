@@ -5,7 +5,7 @@
  *  - Hạng thành viên (Membership Tier), Thẻ CGV 3D ảo, Điểm tích lũy, Thanh tiến trình thăng hạng
  *  - Chuyển nhanh hạng thẻ (MEMBER, VIP, VVIP) để test giao diện
  *  - Đổi mật khẩu bảo mật (Mật khẩu cũ, Mật khẩu mới, Xác nhận mật khẩu)
- *  - Quản lý tài khoản mạng xã hội liên kết (Google, Facebook)
+ *  - Thông tin đăng nhập Google
  */
 
 import React, { useState, useEffect } from 'react';
@@ -48,15 +48,6 @@ function GoogleIcon() {
   );
 }
 
-function FacebookIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 48 48" fill="none">
-      <path fill="#1877F2" d="M48 24C48 10.7 37.3 0 24 0S0 10.7 0 24c0 12 8.8 21.9 20.3 23.7V30.9h-6.1V24h6.1v-5.3c0-6 3.6-9.4 9.1-9.4 2.6 0 5.4.5 5.4.5v5.9h-3c-3 0-3.9 1.9-3.9 3.7V24h6.7l-1.1 6.9h-5.6v16.8C39.2 45.9 48 36 48 24z"/>
-      <path fill="#fff" d="M33.4 30.9l1.1-6.9H28v-4.5c0-1.9.9-3.7 3.9-3.7h3v-5.9s-2.7-.5-5.4-.5c-5.5 0-9.1 3.4-9.1 9.4V24h-6.1v6.9h6.1v16.8c1.2.2 2.5.3 3.7.3s2.4-.1 3.6-.3V30.9h5.6z"/>
-    </svg>
-  );
-}
-
 const TABS = {
   INFO: 'info',
   MEMBERSHIP: 'membership',
@@ -79,10 +70,6 @@ const DEFAULT_MOCK_PROFILE = {
   membershipTier: { code: 'VIP', name: 'VIP Member' },
   total_spend_ytd: 5450000,
   loyaltyPoints: 381500,
-  connectedAccounts: {
-    google: true,
-    facebook: false,
-  },
 };
 
 // Lấy profile ban đầu (kết hợp mock và currentUser nếu có)
@@ -112,11 +99,6 @@ function getInitialProfile(currentUser) {
     tier: (currentUser?.membershipTier?.code || currentUser?.tier || saved?.tier || DEFAULT_MOCK_PROFILE.tier).toUpperCase(),
     total_spend_ytd: Number(currentUser?.total_spend_ytd ?? saved?.total_spend_ytd ?? DEFAULT_MOCK_PROFILE.total_spend_ytd),
     loyaltyPoints: Number(currentUser?.loyaltyPoints ?? saved?.loyaltyPoints ?? DEFAULT_MOCK_PROFILE.loyaltyPoints),
-    connectedAccounts: {
-      ...DEFAULT_MOCK_PROFILE.connectedAccounts,
-      ...(saved?.connectedAccounts || {}),
-      ...(currentUser?.connectedAccounts || {}),
-    },
   };
 }
 
@@ -164,6 +146,22 @@ export default function ProfilePage() {
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [selectedTicketModal, setSelectedTicketModal] = useState(null);
   const [bookingFilterStatus, setBookingFilterStatus] = useState('CONFIRMED');
+  const [paymentAttempts, setPaymentAttempts] = useState({});
+
+  const checkPaymentAttempt = async (bookingId) => {
+    try {
+      const payment = await ApiService.getPaymentStatus(bookingId);
+      setPaymentAttempts(previous => ({ ...previous, [bookingId]: payment.status }));
+      return payment.status;
+    } catch (error) {
+      if (error.status !== 404) {
+        setPaymentAttempts(previous => ({ ...previous, [bookingId]: 'UNKNOWN' }));
+        throw error;
+      }
+      setPaymentAttempts(previous => ({ ...previous, [bookingId]: 'NONE' }));
+      return 'NONE';
+    }
+  };
 
   const fetchBookings = async () => {
     setBookingsLoading(true);
@@ -195,6 +193,8 @@ export default function ProfilePage() {
       );
 
       setBookings(enrichedList);
+      await Promise.all(enrichedList.filter(booking => booking.status === 'PAYMENT_PENDING')
+        .map(booking => checkPaymentAttempt(booking.bookingId).catch(() => null)));
     } catch (err) {
       console.warn('Could not load user bookings:', err.message);
     } finally {
@@ -210,6 +210,15 @@ export default function ProfilePage() {
 
   const handlePayPendingBooking = async (booking) => {
     try {
+      const attempt = await checkPaymentAttempt(booking.bookingId);
+      if (attempt !== 'NONE') {
+        toast.warning('Đơn đã có giao dịch VNPay. Vui lòng kiểm tra kết quả hoặc liên hệ hỗ trợ trước khi thanh toán lại.');
+        return;
+      }
+      if (!booking.paymentDeadline || Date.parse(booking.paymentDeadline) <= Date.now()) {
+        toast.warning('Đơn đã hết hạn thanh toán. Vui lòng kiểm tra trạng thái đơn.');
+        return;
+      }
       const paymentUrl = await ApiService.createVnpayPaymentUrl(booking.bookingId, booking.finalAmount);
       if (paymentUrl && paymentUrl.startsWith('http')) {
         window.location.href = paymentUrl;
@@ -217,13 +226,17 @@ export default function ProfilePage() {
         toast.warning('Không thể tạo liên kết thanh toán lúc này.');
       }
     } catch (err) {
-      toast.error(err.message || 'Lỗi tạo liên kết thanh toán VNPAY');
+      toast.error(err.message || 'Không xác minh được giao dịch. Vui lòng thử kiểm tra lại.');
     }
   };
 
   const handleCancelPendingBooking = async (bookingId) => {
     if (!window.confirm('Bạn có chắc chắn muốn hủy đơn đặt vé này và trả lại ghế?')) return;
     try {
+      if (await checkPaymentAttempt(bookingId) !== 'NONE') {
+        toast.warning('Đơn có giao dịch VNPay; cần kiểm tra kết quả trước khi hủy.');
+        return;
+      }
       await ApiService.cancelBooking(bookingId);
       toast.success('Đã hủy đơn đặt vé thành công!');
       fetchBookings();
@@ -362,32 +375,6 @@ export default function ProfilePage() {
       setPwdForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
       toast.success('Đổi mật khẩu thành công! Mật khẩu mới đã có hiệu lực. 🔒');
     }, 450);
-  };
-
-  // ── Xử lý Liên kết mạng xã hội (Mock) ──
-  const handleToggleSocial = (provider) => {
-    const isCurrentlyConnected = profile.connectedAccounts?.[provider];
-    if (isCurrentlyConnected) {
-      if (window.confirm(`Bạn có chắc chắn muốn hủy liên kết tài khoản ${provider.toUpperCase()}?`)) {
-        const updatedAccounts = { ...profile.connectedAccounts, [provider]: false };
-        const updated = { ...profile, connectedAccounts: updatedAccounts };
-        setProfile(updated);
-        try {
-          localStorage.setItem('cgv_mock_profile', JSON.stringify(updated));
-        } catch {}
-        updateUser(updated);
-        toast.info(`Đã hủy liên kết tài khoản ${provider.toUpperCase()}.`);
-      }
-    } else {
-      const updatedAccounts = { ...profile.connectedAccounts, [provider]: true };
-      const updated = { ...profile, connectedAccounts: updatedAccounts };
-      setProfile(updated);
-      try {
-        localStorage.setItem('cgv_mock_profile', JSON.stringify(updated));
-      } catch {}
-      updateUser(updated);
-      toast.success(`Đã kết nối tài khoản ${provider.toUpperCase()} thành công! 🎉`);
-    }
   };
 
   // Avatar chữ cái
@@ -862,6 +849,7 @@ export default function ProfilePage() {
                       const isConfirmed = b.status === 'CONFIRMED' || b.status === 'SUCCESS';
                       const isCancelled = b.status === 'CANCELLED';
                       const isExpired = b.status === 'EXPIRED';
+                      const attempt = paymentAttempts[b.bookingId];
 
                       const statusBg = isConfirmed
                         ? 'rgba(16, 185, 129, 0.15)'
@@ -973,24 +961,30 @@ export default function ProfilePage() {
                               </button>
                             )}
 
-                            {isPending && (
+                              {isPending && (
                               <>
-                                <button
+                                  {attempt === 'NONE' && <button
                                   type="button"
                                   className="btn-secondary"
                                   onClick={() => handleCancelPendingBooking(b.bookingId)}
                                   style={{ padding: '7px 14px', fontSize: '0.82rem', color: '#f87171' }}
                                 >
                                   Hủy vé
-                                </button>
-                                <button
+                                  </button>}
+                                  {attempt === 'NONE' && b.paymentDeadline && Date.parse(b.paymentDeadline) > Date.now() && <button
                                   type="button"
                                   className="btn-primary"
                                   onClick={() => handlePayPendingBooking(b)}
                                   style={{ padding: '7px 18px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}
                                 >
                                   <CreditCard size={15} /> Thanh toán qua VNPAY
-                                </button>
+                                  </button>}
+                                  {attempt !== 'NONE' && <span role="status" style={{ fontSize: '0.82rem', color: '#fbbf24' }}>
+                                    {attempt === 'PENDING' ? 'Đang chờ xác minh VNPay' : 'Kiểm tra kết quả giao dịch trước khi thao tác tiếp'}
+                                  </span>}
+                                  {attempt !== 'NONE' && <button type="button" className="btn-secondary" onClick={fetchBookings}>
+                                    Kiểm tra lại
+                                  </button>}
                               </>
                             )}
 
@@ -1114,15 +1108,15 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* ──────── TAB 4: TÀI KHOẢN LIÊN KẾT ──────── */}
+          {/* ──────── TAB 4: GOOGLE ──────── */}
           {activeTab === TABS.SOCIAL && (
             <div>
               <div className="profile-card-header">
                 <h3>
-                  <Share2 size={22} className="text-primary" /> Tài khoản mạng xã hội liên kết
+                  <Share2 size={22} className="text-primary" /> Đăng nhập Google
                 </h3>
                 <p>
-                  Liên kết tài khoản Google hoặc Facebook để đăng nhập nhanh chỉ với 1 cú nhấp chuột mà không cần gõ mật khẩu
+                  Sử dụng nút Google ở màn đăng nhập. Trang này không liên kết hoặc hủy liên kết tài khoản.
                 </p>
               </div>
 
@@ -1135,62 +1129,14 @@ export default function ProfilePage() {
                     </div>
                     <div className="social-connect-info">
                       <h4>Google</h4>
-                      <p>
-                        {profile.connectedAccounts?.google
-                          ? `Đã liên kết với email: ${profile.email}`
-                          : 'Chưa liên kết tài khoản Google'}
-                      </p>
+                      <p>Trạng thái liên kết được quản lý trong Keycloak, không thay đổi tại đây.</p>
                     </div>
                   </div>
 
-                  <div className="social-connect-actions">
-                    <span className={`social-status-badge ${profile.connectedAccounts?.google ? 'connected' : 'unconnected'}`}>
-                      {profile.connectedAccounts?.google ? 'Đã liên kết' : 'Chưa liên kết'}
-                    </span>
-                    <button
-                      type="button"
-                      className={`btn-connect ${profile.connectedAccounts?.google ? 'btn-connect-outline' : 'btn-connect-primary'}`}
-                      onClick={() => handleToggleSocial('google')}
-                    >
-                      {profile.connectedAccounts?.google ? 'Hủy liên kết' : 'Liên kết ngay'}
-                    </button>
-                  </div>
                 </div>
 
-                {/* Facebook */}
-                <div className="social-connect-item">
-                  <div className="social-connect-left">
-                    <div className="social-connect-icon">
-                      <FacebookIcon />
-                    </div>
-                    <div className="social-connect-info">
-                      <h4>Facebook</h4>
-                      <p>
-                        {profile.connectedAccounts?.facebook
-                          ? 'Đã liên kết với trang cá nhân Facebook'
-                          : 'Đăng nhập nhanh hơn với tài khoản Facebook cá nhân'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="social-connect-actions">
-                    <span className={`social-status-badge ${profile.connectedAccounts?.facebook ? 'connected' : 'unconnected'}`}>
-                      {profile.connectedAccounts?.facebook ? 'Đã liên kết' : 'Chưa liên kết'}
-                    </span>
-                    <button
-                      type="button"
-                      className={`btn-connect ${profile.connectedAccounts?.facebook ? 'btn-connect-outline' : 'btn-connect-primary'}`}
-                      onClick={() => handleToggleSocial('facebook')}
-                    >
-                      {profile.connectedAccounts?.facebook ? 'Hủy liên kết' : 'Liên kết Facebook'}
-                    </button>
-                  </div>
-                </div>
               </div>
 
-              <div style={{ marginTop: 24, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                💡 <strong>Lưu ý:</strong> Hệ thống sử dụng địa chỉ Email định danh duy nhất. Khi bạn đăng nhập bằng Google hay Facebook có cùng Email, tất cả đều được gom chung vào hồ sơ thành viên CGV này.
-              </div>
             </div>
           )}
         </main>

@@ -23,7 +23,7 @@ export default function MoviesPage({ onOpenBooking }) {
   const searchQ = searchParams.get('q') || '';
   const initialStatus = searchParams.get('status') === 'soon' ? 'COMING_SOON' : 'ALL';
 
-  const [movieList, setMovieList] = useState(MOVIES);
+  const [movieList, setMovieList] = useState(import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true' ? MOVIES : []);
   const [activeTab, setActiveTab] = useState(initialStatus);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState([]);
@@ -33,15 +33,13 @@ export default function MoviesPage({ onOpenBooking }) {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
 
-  const loadMovies = () => {
-    ApiService.getMovies().then(res => {
-      if (Array.isArray(res) && res.length > 0) {
-        setMovieList(res);
-      }
-    }).catch(e => console.warn('Using fallback movies in MoviesPage:', e.message));
-  };
-
   useEffect(() => {
+    let active = true;
+    const loadMovies = () => {
+      (searchQ ? ApiService.searchMovies(searchQ) : ApiService.getMovies()).then(res => {
+        if (active && Array.isArray(res)) setMovieList(res);
+      }).catch(e => console.warn('Could not load movies in MoviesPage:', e.message));
+    };
     loadMovies();
 
     const handleRealtimeUpdate = () => {
@@ -50,9 +48,10 @@ export default function MoviesPage({ onOpenBooking }) {
 
     window.addEventListener('cgv_realtime_movie_updated', handleRealtimeUpdate);
     return () => {
+      active = false;
       window.removeEventListener('cgv_realtime_movie_updated', handleRealtimeUpdate);
     };
-  }, []);
+  }, [searchQ]);
 
   const toggleGenre = (genre) => {
     if (selectedGenres.includes(genre)) {
@@ -76,10 +75,6 @@ export default function MoviesPage({ onOpenBooking }) {
 
   const filteredMovies = useMemo(() => {
     return movieList.filter(m => {
-      // Search term
-      if (searchQ && !m.title.toLowerCase().includes(searchQ.toLowerCase())) {
-        return false;
-      }
       // Status
       if (activeTab === 'NOW_SHOWING' && m.showingStatus !== 'NOW_SHOWING') return false;
       if (activeTab === 'COMING_SOON' && m.showingStatus !== 'COMING_SOON') return false;
@@ -98,7 +93,7 @@ export default function MoviesPage({ onOpenBooking }) {
       if (sortBy === 'duration-asc') return (a.durationMinutes || a.duration || 0) - (b.durationMinutes || b.duration || 0);
       return 0; // default newest
     });
-  }, [searchQ, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
+  }, [movieList, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
 
   useEffect(() => {
     setCurrentPage(1);

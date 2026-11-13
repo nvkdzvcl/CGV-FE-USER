@@ -3,15 +3,7 @@ import { getTokens, saveTokens, clearSession } from './userService';
 import { refreshToken } from './authService';
 
 const API_BASE = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8000';
-
-export function getSessionId() {
-  let sId = localStorage.getItem('cgv_session_id');
-  if (!sId) {
-    sId = 'sess-' + Math.random().toString(36).substring(2, 10);
-    localStorage.setItem('cgv_session_id', sId);
-  }
-  return sId;
-}
+const ENABLE_MOCK_FALLBACK = import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true';
 
 // Token refresh mutex and queue
 let isRefreshing = false;
@@ -29,19 +21,16 @@ const processQueue = (error, token = null) => {
 };
 
 async function doFetch(path, options, token) {
-  const userId = token ? (getTokens()?.user?.id || getSessionId()) : getSessionId();
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
     return await fetch(`${API_BASE}${path}`, {
       signal: options.signal || controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': userId,
-        'X-Guest-Session-Id': getSessionId(),
         ...authHeaders,
         ...(options.headers || {})
       },
@@ -122,8 +111,7 @@ async function request(path, options = {}, fallbackData = null) {
             processQueue(refreshErr, null);
             clearSession();
             window.dispatchEvent(new CustomEvent('cgv_session_expired'));
-            // Nếu là endpoint công khai hoặc bán công khai (như giữ ghế, rạp, phim), thử lại dạng guest
-            if (path.includes('/catalogs/') || path.includes('/seat-locks') || path.includes('/marketings/')) {
+            if (path.includes('/catalogs/') || path.includes('/marketings/')) {
               res = await doFetch(path, options, null);
             } else {
               throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
@@ -140,7 +128,7 @@ async function request(path, options = {}, fallbackData = null) {
             // Thử lại request ban đầu với access token mới nhận từ queue
             res = await doFetch(path, options, newAccessToken);
           } catch (qErr) {
-            if (path.includes('/catalogs/') || path.includes('/seat-locks') || path.includes('/marketings/')) {
+            if (path.includes('/catalogs/') || path.includes('/marketings/')) {
               res = await doFetch(path, options, null);
             } else {
               throw qErr;
@@ -151,7 +139,7 @@ async function request(path, options = {}, fallbackData = null) {
         // Không có refresh token, xóa session lỗi thời và nếu là public endpoint thì retry không có auth header
         clearSession();
         window.dispatchEvent(new CustomEvent('cgv_session_expired'));
-        if (path.includes('/catalogs/') || path.includes('/seat-locks') || path.includes('/marketings/')) {
+        if (path.includes('/catalogs/') || path.includes('/marketings/')) {
           res = await doFetch(path, options, null);
         }
       }
@@ -161,7 +149,9 @@ async function request(path, options = {}, fallbackData = null) {
 
     if (!res.ok) {
       const errMsg = json?.message || `HTTP ${res.status}`;
-      throw new Error(errMsg);
+      const error = new Error(errMsg);
+      error.status = res.status;
+      throw error;
     }
 
     const result = json?.data !== undefined ? json.data : json;
@@ -170,7 +160,7 @@ async function request(path, options = {}, fallbackData = null) {
     }
     return result;
   } catch (err) {
-    if (fallbackData !== null) {
+    if (ENABLE_MOCK_FALLBACK && fallbackData !== null) {
       console.warn(`[API Fallback] ${path} -> using fallback data:`, err.message);
       return typeof fallbackData === 'function' ? fallbackData() : fallbackData;
     }
@@ -189,7 +179,7 @@ export const ApiService = {
       {},
       MOVIES
     );
-    const movieList = Array.isArray(data) ? data : (data?.data || MOVIES);
+    const movieList = Array.isArray(data) ? data : (data?.data || (ENABLE_MOCK_FALLBACK ? MOVIES : []));
     if (!status) return movieList;
     return movieList.filter(m => m.showingStatus === status);
   },
@@ -214,7 +204,7 @@ export const ApiService = {
   searchMovies: async (keyword) => {
     if (!keyword?.trim()) return [];
     return await request(
-      `/api/v1/catalogs/movies/search?keyword=${encodeURIComponent(keyword)}`,
+      `/api/v1/catalogs/movies/search?keyword=${encodeURIComponent(keyword)}&page=0&size=50`,
       {},
       MOVIES.filter(m => m.title.toLowerCase().includes(keyword.toLowerCase()))
     );
@@ -339,7 +329,7 @@ export const ApiService = {
       const list = Array.isArray(data) ? data : (data?.data || []);
       return list;
     } catch {
-      // fallback
+      if (!ENABLE_MOCK_FALLBACK) return [];
     }
 
     // Fallback: Lọc từ PROMOTIONS theo hạng thành viên và tổng tiền đơn hàng
@@ -438,23 +428,11 @@ export const ApiService = {
     });
   },
 
-  releaseSeats: async (showtimeId, seatIds) => {
+  releaseSeats: async (showtimeId, seatIds, signal) => {
     return await request('/api/v1/bookings/seat-locks', {
       method: 'DELETE',
-      body: JSON.stringify({ showtimeId, seatIds, guestSessionId: getSessionId() })
-    });
-  },
-
-  transferSeatLocks: async (showtimeId, seatIds, guestSessionId = null) => {
-    return await request('/api/v1/bookings/seat-locks/transfer', {
-      method: 'POST',
-      body: JSON.stringify({
-        showtimeId,
-        seatIds,
-        guestSessionId: guestSessionId || getSessionId()
-      })
-    }).catch(err => {
-      console.warn('Lỗi transfer seat lock khi đăng nhập:', err);
+      signal,
+      body: JSON.stringify({ showtimeId, seatIds })
     });
   },
 
@@ -465,14 +443,9 @@ export const ApiService = {
   },
 
   createBooking: async (bookingPayload) => {
-    // Tự động đính kèm guestSessionId để hỗ trợ chuyển giao phiên khách vãng lai sang user
-    const payload = {
-      ...bookingPayload,
-      guestSessionId: bookingPayload.guestSessionId || getSessionId()
-    };
     return await request('/api/v1/bookings', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(bookingPayload)
     });
   },
 
@@ -496,17 +469,14 @@ export const ApiService = {
     return await request(`/api/v1/bookings/${bookingId}`);
   },
 
+  getMyPendingBooking: async (showtimeId) => {
+    return await request(`/api/v1/bookings/my-pending?showtimeId=${encodeURIComponent(showtimeId)}`);
+  },
+
   cancelBooking: async (bookingId) => {
     return await request(`/api/v1/bookings/${bookingId}/cancel`, {
       method: 'PUT'
     });
-  },
-
-  lookupGuestBookings: async (payload) => {
-    return await request('/api/v1/bookings/guest-lookup', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    }, []);
   },
 
   // ─────────────────────────────────────────────

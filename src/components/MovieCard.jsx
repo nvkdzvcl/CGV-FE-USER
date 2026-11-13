@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Clock, Play, Info } from "lucide-react";
+import { Clock, Play, Info, Film } from "lucide-react";
 import TrailerModal from "./TrailerModal";
 
 const AGE_CONFIG = {
@@ -28,6 +28,7 @@ const formatVnDate = (dateStr) => {
 export default function MovieCard({ movie, onBookTicket }) {
   const navigate = useNavigate();
   const [isTrailerModalOpen, setIsTrailerModalOpen] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
 
   const isNowShowing = movie.showingStatus === "NOW_SHOWING";
   const ageKey = (movie.ageRating || "P").toUpperCase();
@@ -75,7 +76,15 @@ export default function MovieCard({ movie, onBookTicket }) {
       <div className="movie-card">
         <div className="movie-poster-wrapper">
           <Link to={`/movies/${movie.id}`} className="movie-poster-clickable" title={`Xem chi tiết phim ${movie.title}`}>
-            <img src={movie.posterUrl} alt={movie.title} className="movie-poster" loading="lazy" />
+            {movie.posterUrl && !posterFailed ? (
+              <img src={movie.posterUrl} alt={movie.title} className="movie-poster" loading="lazy" onError={() => setPosterFailed(true)} />
+            ) : (
+              <div className="movie-poster movie-poster-placeholder" role="img" aria-label={`Chưa có poster cho ${movie.title}`}>
+                <Film size={34} aria-hidden="true" />
+                <span>{movie.title}</span>
+                <small>PHIM DEMO</small>
+              </div>
+            )}
 
             {/* Hover overlay with quick play trailer button */}
             <div className="movie-poster-play-overlay">
