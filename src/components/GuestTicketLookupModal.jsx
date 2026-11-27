@@ -31,8 +31,12 @@ export default function GuestTicketLookupModal({ isOpen, onClose }) {
 
   const handleSearch = async (e) => {
     if (e) e.preventDefault();
-    if (!phone.trim() && !email.trim() && !bookingId.trim()) {
-      setError('Vui lòng nhập Số điện thoại, Email hoặc Mã đơn vé.');
+    if (!bookingId.trim()) {
+      setError('Vui lòng nhập Mã đơn vé (có trong email xác nhận).');
+      return;
+    }
+    if (!phone.trim() && !email.trim()) {
+      setError('Vui lòng nhập thêm Email hoặc Số điện thoại đã dùng khi đặt vé.');
       return;
     }
 
@@ -205,7 +209,7 @@ export default function GuestTicketLookupModal({ isOpen, onClose }) {
 
                   <div>
                     <label style={{ display: 'block', color: '#d4d4d8', fontSize: '0.8rem', marginBottom: 6, fontWeight: 500 }}>
-                      Hoặc Mã đơn vé (UUID)
+                      Mã đơn vé (bắt buộc, có trong email xác nhận)
                     </label>
                     <input
                       type="text"

@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { ApiService } from '../services/api';
+import { updateProfile, changePassword } from '../services/userService';
 import toast from '../services/toastService';
 import TicketDetailModal from '../components/TicketDetailModal';
 import '../styles/profile.css';
@@ -65,63 +66,55 @@ const TABS = {
   SOCIAL: 'social',
 };
 
-// Dữ liệu người dùng mẫu chuẩn (Mock data cho test)
-const DEFAULT_MOCK_PROFILE = {
-  id: 'cgv-usr-2026-huy',
-  fullName: 'Lê Hữu Huy',
-  email: 'lhhuy.2005@gmail.com',
-  phone: '0987 654 321',
-  birthDate: '2005-11-21',
+// Giá trị mặc định khi backend chưa trả về trường tương ứng
+const EMPTY_PROFILE = {
+  fullName: '',
+  email: '',
+  phone: '',
+  birthDate: '',
   gender: 'MALE',
-  address: 'Quận 1, TP. Hồ Chí Minh',
-  role: 'USER',
-  tier: 'VIP',
-  membershipTier: { code: 'VIP', name: 'VIP Member' },
-  total_spend_ytd: 5450000,
-  loyaltyPoints: 381500,
+  address: '',
+  tier: 'MEMBER',
+  total_spend_ytd: 0,
+  loyaltyPoints: 0,
   connectedAccounts: {
-    google: true,
+    google: false,
     facebook: false,
   },
 };
 
-// Lấy profile ban đầu (kết hợp mock và currentUser nếu có)
+// Lấy profile từ currentUser (đồng bộ từ GET /users/me trong AuthContext)
 function getInitialProfile(currentUser) {
-  let saved = null;
+  let savedSocial = null;
   try {
-    const raw = localStorage.getItem('cgv_mock_profile');
-    if (raw) saved = JSON.parse(raw);
+    const raw = localStorage.getItem('cgv_social_links');
+    if (raw) savedSocial = JSON.parse(raw);
   } catch {
     // Bỏ qua lỗi parse
   }
 
-  const base = {
-    ...DEFAULT_MOCK_PROFILE,
-    ...(saved || {}),
-    ...(currentUser || {}),
-  };
-
   return {
-    ...base,
-    fullName: currentUser?.fullName || saved?.fullName || DEFAULT_MOCK_PROFILE.fullName,
-    email: currentUser?.email || saved?.email || DEFAULT_MOCK_PROFILE.email,
-    phone: currentUser?.phone || saved?.phone || DEFAULT_MOCK_PROFILE.phone,
-    birthDate: currentUser?.birthDate || saved?.birthDate || DEFAULT_MOCK_PROFILE.birthDate,
-    gender: currentUser?.gender || saved?.gender || DEFAULT_MOCK_PROFILE.gender,
-    address: currentUser?.address || saved?.address || DEFAULT_MOCK_PROFILE.address,
-    tier: (currentUser?.membershipTier?.code || currentUser?.tier || saved?.tier || DEFAULT_MOCK_PROFILE.tier).toUpperCase(),
-    total_spend_ytd: Number(currentUser?.total_spend_ytd ?? saved?.total_spend_ytd ?? DEFAULT_MOCK_PROFILE.total_spend_ytd),
-    loyaltyPoints: Number(currentUser?.loyaltyPoints ?? saved?.loyaltyPoints ?? DEFAULT_MOCK_PROFILE.loyaltyPoints),
+    ...EMPTY_PROFILE,
+    ...(currentUser || {}),
+    fullName: currentUser?.fullName || '',
+    email: currentUser?.email || '',
+    phone: currentUser?.phone || '',
+    birthDate: currentUser?.birthDate || '',
+    gender: currentUser?.gender || EMPTY_PROFILE.gender,
+    address: currentUser?.address || '',
+    tier: (currentUser?.membershipTier?.code || currentUser?.tier || EMPTY_PROFILE.tier).toUpperCase(),
+    total_spend_ytd: Number(currentUser?.total_spend_ytd ?? 0),
+    loyaltyPoints: Number(currentUser?.loyaltyPoints ?? 0),
     connectedAccounts: {
-      ...DEFAULT_MOCK_PROFILE.connectedAccounts,
-      ...(saved?.connectedAccounts || {}),
+      ...EMPTY_PROFILE.connectedAccounts,
+      ...(savedSocial || {}),
       ...(currentUser?.connectedAccounts || {}),
     },
   };
 }
 
 export default function ProfilePage() {
-  const { currentUser, updateUser } = useAuth();
+  const { currentUser, tokens, updateUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Tab hiện tại
@@ -252,92 +245,38 @@ export default function ProfilePage() {
     setSearchParams({ tab: tabKey });
   };
 
-  // ── Xử lý Chuyển đổi nhanh Hạng thẻ (Mock Test Switcher) ──
-  const handleSwitchTier = (newTier) => {
-    let newSpend = 1200000;
-    let newPoints = 60000;
-    if (newTier === 'VIP') {
-      newSpend = 5450000;
-      newPoints = 381500;
-    } else if (newTier === 'VVIP') {
-      newSpend = 12500000;
-      newPoints = 1250000;
-    }
-
-    const updated = {
-      ...profile,
-      tier: newTier,
-      membershipTier: { code: newTier, name: `${newTier} Member` },
-      total_spend_ytd: newSpend,
-      loyaltyPoints: newPoints,
-    };
-
-    setProfile(updated);
-    try {
-      localStorage.setItem('cgv_mock_profile', JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
-    updateUser(updated);
-    toast.info(`Đã chuyển đổi xem trước hạng: ${newTier}`);
-  };
-
-  // ── Xử lý Khôi phục dữ liệu mẫu ban đầu ──
-  const handleResetMockData = () => {
-    if (window.confirm('Khôi phục lại dữ liệu hồ sơ mẫu chuẩn (Lê Hữu Huy - VIP)?')) {
-      try {
-        localStorage.removeItem('cgv_mock_profile');
-      } catch {
-        // ignore
-      }
-      const reset = { ...DEFAULT_MOCK_PROFILE };
-      setProfile(reset);
-      setInfoForm({
-        fullName: reset.fullName,
-        email: reset.email,
-        phone: reset.phone,
-        birthDate: reset.birthDate,
-        gender: reset.gender,
-        address: reset.address,
-      });
-      updateUser(reset);
-      toast.success('Đã khôi phục dữ liệu hồ sơ mẫu ban đầu!');
-    }
-  };
-
   // ── Xử lý Lưu thông tin cá nhân ──
-  const handleSaveInfo = (e) => {
+  const handleSaveInfo = async (e) => {
     e.preventDefault();
     if (!infoForm.fullName.trim()) {
       toast.warning('Vui lòng không để trống họ và tên.');
       return;
     }
+    if (!tokens?.accessToken) {
+      toast.error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
+      return;
+    }
 
     setInfoLoading(true);
-    setTimeout(() => {
-      const updated = {
-        ...profile,
+    try {
+      const saved = await updateProfile(tokens.accessToken, {
         fullName: infoForm.fullName.trim(),
-        phone: infoForm.phone,
-        birthDate: infoForm.birthDate,
-        gender: infoForm.gender,
-        address: infoForm.address,
-      };
-
-      setProfile(updated);
-      try {
-        localStorage.setItem('cgv_mock_profile', JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      updateUser(updated);
-      setInfoLoading(false);
+        phone: infoForm.phone?.trim() || null,
+        birthDate: infoForm.birthDate || null,
+        gender: infoForm.gender || null,
+        address: infoForm.address?.trim() ?? null,
+      });
+      updateUser(saved);
       toast.success('Cập nhật hồ sơ cá nhân thành công! 🎉');
-    }, 300);
+    } catch (err) {
+      toast.error(err.message || 'Không thể cập nhật hồ sơ.');
+    } finally {
+      setInfoLoading(false);
+    }
   };
 
   // ── Xử lý Đổi mật khẩu ──
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (!pwdForm.oldPassword) {
       toast.warning('Vui lòng nhập mật khẩu hiện tại.');
@@ -356,12 +295,24 @@ export default function ProfilePage() {
       return;
     }
 
+    if (!tokens?.accessToken) {
+      toast.error('Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.');
+      return;
+    }
+
     setPwdLoading(true);
-    setTimeout(() => {
-      setPwdLoading(false);
+    try {
+      await changePassword(tokens.accessToken, {
+        currentPassword: pwdForm.oldPassword,
+        newPassword: pwdForm.newPassword,
+      });
       setPwdForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
       toast.success('Đổi mật khẩu thành công! Mật khẩu mới đã có hiệu lực. 🔒');
-    }, 450);
+    } catch (err) {
+      toast.error(err.message || 'Không thể đổi mật khẩu.');
+    } finally {
+      setPwdLoading(false);
+    }
   };
 
   // ── Xử lý Liên kết mạng xã hội (Mock) ──
@@ -373,7 +324,7 @@ export default function ProfilePage() {
         const updated = { ...profile, connectedAccounts: updatedAccounts };
         setProfile(updated);
         try {
-          localStorage.setItem('cgv_mock_profile', JSON.stringify(updated));
+          localStorage.setItem('cgv_social_links', JSON.stringify(updated.connectedAccounts));
         } catch {}
         updateUser(updated);
         toast.info(`Đã hủy liên kết tài khoản ${provider.toUpperCase()}.`);
@@ -383,7 +334,7 @@ export default function ProfilePage() {
       const updated = { ...profile, connectedAccounts: updatedAccounts };
       setProfile(updated);
       try {
-        localStorage.setItem('cgv_mock_profile', JSON.stringify(updated));
+        localStorage.setItem('cgv_social_links', JSON.stringify(updated.connectedAccounts));
       } catch {}
       updateUser(updated);
       toast.success(`Đã kết nối tài khoản ${provider.toUpperCase()} thành công! 🎉`);
@@ -405,53 +356,6 @@ export default function ProfilePage() {
 
   return (
     <div className="profile-container">
-      {/* ── Mock Test Info Banner ── */}
-      <div className="profile-mock-banner">
-        <div className="profile-mock-text">
-          <Sparkles size={18} style={{ color: '#c084fc' }} />
-          <span>
-            Đang hiển thị hồ sơ mẫu: <strong>{profile.fullName}</strong> ({profile.email})
-          </span>
-          <span className="profile-mock-badge">Mock Mode</span>
-        </div>
-
-        <div className="profile-mock-controls">
-          <div className="tier-switcher" title="Chuyển nhanh hạng thành viên để test giao diện thẻ 3D">
-            <button
-              type="button"
-              className={`tier-btn ${currentTier === 'MEMBER' ? 'active member' : ''}`}
-              onClick={() => handleSwitchTier('MEMBER')}
-            >
-              MEMBER
-            </button>
-            <button
-              type="button"
-              className={`tier-btn ${currentTier === 'VIP' ? 'active vip' : ''}`}
-              onClick={() => handleSwitchTier('VIP')}
-            >
-              VIP
-            </button>
-            <button
-              type="button"
-              className={`tier-btn ${currentTier === 'VVIP' ? 'active vvip' : ''}`}
-              onClick={() => handleSwitchTier('VVIP')}
-            >
-              VVIP
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="btn-reset-mock"
-            onClick={handleResetMockData}
-            title="Khôi phục dữ liệu mẫu ban đầu"
-          >
-            <RotateCcw size={13} style={{ display: 'inline', marginRight: 4 }} />
-            Khôi phục
-          </button>
-        </div>
-      </div>
-
       {/* ── Banner Header Hồ Sơ ── */}
       <section className="profile-hero">
         <div className="profile-hero-left">

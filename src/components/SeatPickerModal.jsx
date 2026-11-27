@@ -226,18 +226,6 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
       .catch(err => console.warn('Lỗi tải voucher khả dụng:', err));
   }, [rawTotal, userTier, currentUser]);
 
-  // Khi khách vãng lai đăng nhập thành công tài khoản, tự động chuyển giao quyền giữ các ghế đã chọn sang account
-  useEffect(() => {
-    if (currentUser?.id && selectedSeatIds.length > 0 && showtimeId && showtimeId.length === 36) {
-      const seatDbIds = selectedSeatIds.map(id => seats[id]?.dbId).filter(id => id && id.length === 36);
-      if (seatDbIds.length > 0) {
-        ApiService.transferSeatLocks(showtimeId, seatDbIds, sessionId).catch(err => {
-          console.warn('Lỗi transfer seat lock khi login:', err);
-        });
-      }
-    }
-  }, [currentUser?.id]);
-
   // Realtime WebSocket for seat lock events
   const handleSocketSeatEvent = useCallback((event) => {
     if (!event?.seatIds || !Array.isArray(event.seatIds)) return;

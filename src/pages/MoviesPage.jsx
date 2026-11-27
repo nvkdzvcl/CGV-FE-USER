@@ -24,6 +24,8 @@ export default function MoviesPage({ onOpenBooking }) {
   const initialStatus = searchParams.get('status') === 'soon' ? 'COMING_SOON' : 'ALL';
 
   const [movieList, setMovieList] = useState(MOVIES);
+  // Kết quả tìm kiếm từ backend (Elasticsearch: tên phim, diễn viên, đạo diễn)
+  const [searchResults, setSearchResults] = useState(null);
   const [activeTab, setActiveTab] = useState(initialStatus);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState([]);
@@ -54,6 +56,18 @@ export default function MoviesPage({ onOpenBooking }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!searchQ.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    let cancelled = false;
+    ApiService.searchMovies(searchQ)
+      .then(res => { if (!cancelled) setSearchResults(Array.isArray(res) ? res : []); })
+      .catch(() => { if (!cancelled) setSearchResults(null); });
+    return () => { cancelled = true; };
+  }, [searchQ]);
+
   const toggleGenre = (genre) => {
     if (selectedGenres.includes(genre)) {
       setSelectedGenres(selectedGenres.filter(g => g !== genre));
@@ -75,9 +89,10 @@ export default function MoviesPage({ onOpenBooking }) {
   const selectedAgeConfig = ALL_AGE_RATINGS.find(a => a.code === selectedAge);
 
   const filteredMovies = useMemo(() => {
-    return movieList.filter(m => {
-      // Search term
-      if (searchQ && !m.title.toLowerCase().includes(searchQ.toLowerCase())) {
+    const baseList = searchQ && searchResults ? searchResults : movieList;
+    return baseList.filter(m => {
+      // Search term (chỉ lọc tại chỗ khi backend tìm kiếm không phản hồi)
+      if (searchQ && !searchResults && !m.title.toLowerCase().includes(searchQ.toLowerCase())) {
         return false;
       }
       // Status
@@ -96,9 +111,10 @@ export default function MoviesPage({ onOpenBooking }) {
     }).sort((a, b) => {
       if (sortBy === 'duration-desc') return (b.durationMinutes || b.duration || 0) - (a.durationMinutes || a.duration || 0);
       if (sortBy === 'duration-asc') return (a.durationMinutes || a.duration || 0) - (b.durationMinutes || b.duration || 0);
-      return 0; // default newest
+      if (searchQ && searchResults) return 0; // giữ thứ tự liên quan từ Elasticsearch
+      return String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')); // mới nhất
     });
-  }, [searchQ, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
+  }, [movieList, searchResults, searchQ, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
 
   useEffect(() => {
     setCurrentPage(1);

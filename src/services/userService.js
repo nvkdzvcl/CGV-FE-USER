@@ -61,6 +61,23 @@ export async function updateProfile(accessToken, payload) {
   return res.data;
 }
 
+/**
+ * Đổi mật khẩu tài khoản hiện tại (xác minh mật khẩu cũ qua Keycloak ở backend).
+ * @param {string} accessToken
+ * @param {{ currentPassword: string, newPassword: string }} payload
+ */
+export async function changePassword(accessToken, payload) {
+  const res = await userRequest(
+    `${USER_BASE}/me/password`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    accessToken
+  );
+  return res;
+}
+
 // ───────────────────────────────────────────────
 // Local Storage Helpers (persist user session)
 // ───────────────────────────────────────────────

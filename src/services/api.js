@@ -178,6 +178,17 @@ async function request(path, options = {}, fallbackData = null) {
   }
 }
 
+// Backend trả `genres` (List<String>); các component cũ đọc `genre`.
+function normalizeMovie(m) {
+  if (!m || typeof m !== 'object') return m;
+  const genre = m.genre ?? (Array.isArray(m.genres) ? m.genres : undefined);
+  return genre === undefined ? m : { ...m, genre };
+}
+
+function normalizeMovies(list) {
+  return Array.isArray(list) ? list.map(normalizeMovie) : list;
+}
+
 export const ApiService = {
   // ─────────────────────────────────────────────
   // 1. CATALOG: MOVIES
@@ -189,17 +200,17 @@ export const ApiService = {
       {},
       MOVIES
     );
-    const movieList = Array.isArray(data) ? data : (data?.data || MOVIES);
+    const movieList = normalizeMovies(Array.isArray(data) ? data : (data?.data || MOVIES));
     if (!status) return movieList;
     return movieList.filter(m => m.showingStatus === status);
   },
 
   getMovieById: async (id) => {
-    return await request(
+    return normalizeMovie(await request(
       `/api/v1/catalogs/movies/${id}`,
       {},
       MOVIES.find(m => m.id === id || m.id === Number(id)) || MOVIES[0]
-    );
+    ));
   },
 
   getMovieCasts: async (movieId) => {
@@ -213,11 +224,12 @@ export const ApiService = {
 
   searchMovies: async (keyword) => {
     if (!keyword?.trim()) return [];
-    return await request(
+    const data = await request(
       `/api/v1/catalogs/movies/search?keyword=${encodeURIComponent(keyword)}`,
       {},
       MOVIES.filter(m => m.title.toLowerCase().includes(keyword.toLowerCase()))
     );
+    return normalizeMovies(Array.isArray(data) ? data : (data?.data || []));
   },
 
   // ─────────────────────────────────────────────
@@ -442,19 +454,6 @@ export const ApiService = {
     return await request('/api/v1/bookings/seat-locks', {
       method: 'DELETE',
       body: JSON.stringify({ showtimeId, seatIds, guestSessionId: getSessionId() })
-    });
-  },
-
-  transferSeatLocks: async (showtimeId, seatIds, guestSessionId = null) => {
-    return await request('/api/v1/bookings/seat-locks/transfer', {
-      method: 'POST',
-      body: JSON.stringify({
-        showtimeId,
-        seatIds,
-        guestSessionId: guestSessionId || getSessionId()
-      })
-    }).catch(err => {
-      console.warn('Lỗi transfer seat lock khi đăng nhập:', err);
     });
   },
 
