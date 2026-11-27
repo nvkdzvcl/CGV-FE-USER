@@ -472,6 +472,25 @@
   display: block;
   transition: transform 0.4s ease;
 }
+.movie-poster-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px;
+  text-align: center;
+  color: #f5eee6;
+  background: radial-gradient(circle at 25% 20%, #7a392d, transparent 45%), linear-gradient(140deg, #182b36, #0e131c 75%);
+  font-family: Georgia, serif;
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
+  font-weight: 700;
+}
+.movie-poster-placeholder small {
+  font: 600 0.65rem sans-serif;
+  letter-spacing: 0.25em;
+  color: #e4ac8c;
+}
 .movie-card:hover .movie-poster {
   transform: scale(1.05);
 }

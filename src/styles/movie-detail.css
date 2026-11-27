@@ -103,6 +103,9 @@
   object-fit: cover;
   display: block;
 }
+.movie-detail-poster-img.movie-poster-placeholder {
+  display: flex;
+}
 
 .movie-detail-poster-play-btn {
   position: absolute;

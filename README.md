@@ -29,7 +29,8 @@
 
 5. **Sơ đồ Chọn ghế Real-time & Thanh toán (Modal Booking Flow):**
    - Sơ đồ phòng chiếu 8 hàng ghế (A–H) phân loại rõ ràng: Ghế thường, Ghế VIP, Ghế đôi Sweetbox.
-   - Đồng hồ đếm ngược 10 phút giữ ghế (Holding Lock Timeout).
+   - Đồng hồ giữ ghế tạm 4 phút bằng khóa Redis; đơn đã tạo có hạn thanh toán riêng do BE quản lý.
+   - Yêu cầu đăng nhập trước khi chọn ghế; không lưu checkout trong `sessionStorage`, đọc đơn chờ từ BE bằng JWT.
    - Ô nhập mã giảm giá áp dụng Voucher trừ tiền trực tiếp.
    - Xác nhận thanh toán VNPay / MoMo và hiển thị mã vé QR đặt chỗ thành công.
 

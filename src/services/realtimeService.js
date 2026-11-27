@@ -18,6 +18,7 @@ class RealtimeService {
     this.channel = null;
     this.catalogEventSource = null;
     this.reconnectTimer = null;
+    this.reconnectDelay = 5000;
 
     if (typeof window !== 'undefined') {
       try {
@@ -58,6 +59,7 @@ class RealtimeService {
       this.catalogEventSource = new EventSource(sseUrl);
 
       this.catalogEventSource.onopen = () => {
+        this.reconnectDelay = 5000;
         console.log('%c[User Realtime] 🟢 Đã kết nối Catalog SSE Stream thành công:', 'color: #10b981; font-weight: bold; background: #064e3b; padding: 2px 6px; border-radius: 4px;', sseUrl);
       };
 
@@ -89,10 +91,11 @@ class RealtimeService {
       this.catalogEventSource.addEventListener('SHOWTIME_CHANGED', handleCatalogEvent);
 
       this.catalogEventSource.onerror = () => {
-        console.warn('[User Realtime] ⚠️ Mất kết nối Catalog SSE, sẽ thử kết nối lại sau 5s...');
+        if (this.reconnectDelay === 5000) console.warn('[User Realtime] Mất kết nối Catalog SSE; đang thử lại.');
         this.catalogEventSource.close();
         clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = setTimeout(() => this.initCatalogSse(), 5000);
+        this.reconnectTimer = setTimeout(() => this.initCatalogSse(), this.reconnectDelay);
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, 60000);
       };
     } catch (e) {
       console.warn('[Realtime] Catalog SSE connection failed:', e);

@@ -83,7 +83,7 @@ export async function registerVerify(payload) {
 }
 
 /**
- * Đồng bộ user từ social login (Google/Facebook) về DB local.
+ * Đồng bộ user từ Google về DB local.
  * @param {string} accessToken - JWT access token từ Keycloak
  * @param {string} [fullName] - Họ và tên tùy chỉnh do user nhập
  * @returns {Promise<any>} UserResponse từ server
@@ -213,7 +213,7 @@ export async function logout(refreshTokenValue) {
 // Keycloak Social Login URLs (Authorization Code Flow)
 // ───────────────────────────────────────────────
 
-export function buildSocialLoginUrl(provider) {
+export function buildSocialLoginUrl() {
   let keycloakBase =
     import.meta.env.VITE_KEYCLOAK_URL || 'https://d2z63drupmmdh8.cloudfront.net';
   if (keycloakBase.startsWith('http://') && !keycloakBase.includes('localhost')) {
@@ -231,7 +231,7 @@ export function buildSocialLoginUrl(provider) {
     `&redirect_uri=${redirectUri}` +
     `&response_type=code` +
     `&scope=openid+profile+email` +
-    `&kc_idp_hint=${provider}` +
+    `&kc_idp_hint=google` +
     `&prompt=login`
   );
 }

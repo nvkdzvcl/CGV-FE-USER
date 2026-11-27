@@ -3,7 +3,7 @@
  * Modal đăng nhập / đăng ký với đầy đủ luồng thật:
  *  - Tab "Đăng nhập": email + password → POST /auth/login
  *  - Tab "Đăng ký": email + fullName + password → POST /register/init → nhập OTP → POST /register/verify
- *  - Nút Google / Facebook: redirect sang Keycloak SSO
+ *  - Nút Google: redirect sang Keycloak SSO
  *  - Tất cả lỗi được bắt và hiển thị qua toast
  */
 
@@ -19,7 +19,7 @@ import toast from '../services/toastService';
 const TAB = { LOGIN: 'login', REGISTER: 'register', FORGOT: 'forgot' };
 const REGISTER_STEP = { FORM: 'form', OTP: 'otp' };
 
-// ─────────── Google & Facebook SVG Icon ───────────
+// ─────────── Google SVG Icon ───────────
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
@@ -31,26 +31,16 @@ function GoogleIcon() {
   );
 }
 
-function FacebookIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
-      <path fill="#1877F2" d="M48 24C48 10.7 37.3 0 24 0S0 10.7 0 24c0 12 8.8 21.9 20.3 23.7V30.9h-6.1V24h6.1v-5.3c0-6 3.6-9.4 9.1-9.4 2.6 0 5.4.5 5.4.5v5.9h-3c-3 0-3.9 1.9-3.9 3.7V24h6.7l-1.1 6.9h-5.6v16.8C39.2 45.9 48 36 48 24z"/>
-      <path fill="#fff" d="M33.4 30.9l1.1-6.9H28v-4.5c0-1.9.9-3.7 3.9-3.7h3v-5.9s-2.7-.5-5.4-.5c-5.5 0-9.1 3.4-9.1 9.4V24h-6.1v6.9h6.1v16.8c1.2.2 2.5.3 3.7.3s2.4-.1 3.6-.3V30.9h5.6z"/>
-    </svg>
-  );
-}
-
 // ─────────── Social Login Button ───────────
-function SocialLoginButton({ provider, onClick }) {
-  const isGoogle = provider === 'google';
+function SocialLoginButton({ onClick }) {
   return (
     <button
       type="button"
-      className={`btn-social btn-social-${provider}`}
+      className="btn-social btn-social-google"
       onClick={onClick}
     >
-      {isGoogle ? <GoogleIcon /> : <FacebookIcon />}
-      <span>Tiếp tục với {isGoogle ? 'Google' : 'Facebook'}</span>
+      <GoogleIcon />
+      <span>Tiếp tục với Google</span>
     </button>
   );
 }
@@ -759,8 +749,8 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
     }
   }
 
-  function handleSocialLogin(provider) {
-    const url = buildSocialLoginUrl(provider);
+  function handleSocialLogin() {
+    const url = buildSocialLoginUrl();
     window.location.href = url;
   }
 
@@ -837,12 +827,7 @@ export default function AuthModal({ initialTab = TAB.LOGIN, onClose }) {
             {/* Social Login Buttons */}
             <div className="auth-social-btns">
               <SocialLoginButton
-                provider="google"
-                onClick={() => handleSocialLogin('google')}
-              />
-              <SocialLoginButton
-                provider="facebook"
-                onClick={() => handleSocialLogin('facebook')}
+                onClick={handleSocialLogin}
               />
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -29,6 +29,7 @@ function AppContent() {
   const [authModal, setAuthModal] = useState({ isOpen: false, tab: 'login' });
   const [scheduleMovie, setScheduleMovie] = useState(null);
   const [bookingContext, setBookingContext] = useState(null);
+  const seatReleaseRef = useRef(null);
 
   // Real-time synchronization notifications
   useEffect(() => {
@@ -62,11 +63,20 @@ function AppContent() {
 
   const handleLogout = async () => {
     if (window.confirm('Bạn có chắc chắn muốn đăng xuất tài khoản?')) {
+      try {
+        await seatReleaseRef.current?.();
+      } catch (err) {
+        console.warn('Không thể nhả khóa ghế trước khi đăng xuất; khóa sẽ hết TTL:', err);
+      }
       await logoutUser();
     }
   };
 
   const handleOpenBooking = (context) => {
+    if (!currentUser) {
+      handleOpenAuth('login');
+      return;
+    }
     // Nếu đã có suất chiếu thật từ QuickBooking hoặc MovieScheduleModal, mở thẳng màn hình chọn ghế
     if (context?.showtimeId || context?.showtime?.id) {
       setBookingContext(context);
@@ -77,15 +87,15 @@ function AppContent() {
       setScheduleMovie(context.movie);
       return;
     }
-    if (!currentUser) {
-      handleOpenAuth('login');
-      return;
-    }
     setBookingContext(context);
   };
 
   const handleSelectShowtime = (ctx) => {
     setScheduleMovie(null);
+    if (!currentUser) {
+      handleOpenAuth('login');
+      return;
+    }
     setBookingContext(ctx);
   };
 
@@ -133,6 +143,7 @@ function AppContent() {
         <ErrorBoundary onReset={handleCloseBooking}>
           <SeatPickerModal
             bookingContext={bookingContext}
+            seatReleaseRef={seatReleaseRef}
             onClose={handleCloseBooking}
             onOpenAuth={handleOpenAuth}
             onBookingSuccess={(res) => console.log('Booking successful:', res)}

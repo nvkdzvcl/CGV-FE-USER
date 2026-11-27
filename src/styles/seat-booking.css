@@ -142,6 +142,7 @@
 .seats-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
   padding: 10px 16px;
   width: 100%;
   box-sizing: border-box;
@@ -329,6 +330,12 @@
   bottom: 0;
   z-index: 100;
   box-sizing: border-box;
+}
+
+@media (max-height: 500px) and (min-width: 769px) {
+  .booking-checkout-panel {
+    position: static;
+  }
 }
 
 .checkout-info {

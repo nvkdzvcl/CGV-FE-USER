@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Clock,
@@ -170,11 +170,12 @@ export default function MovieDetailPage({ onOpenBooking }) {
   const [selectedFormat, setSelectedFormat] = useState('ALL');
   const [selectedMode, setSelectedMode] = useState('ALL'); // 'ALL' | 'SUBTITLED' | 'DUBBED'
 
-  const [movie, setMovie] = useState(() => MOVIES.find((m) => m.id === id || m.id === Number(id)) || null);
-  const [casts, setCasts] = useState([]);
+  const [movie, setMovie] = useState(() => import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true' ? MOVIES.find((m) => m.id === id || m.id === Number(id)) || null : null);
+  const [movieError, setMovieError] = useState(null);
+  const [retry, setRetry] = useState(0);
   const [scheduleData, setScheduleData] = useState(null);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
-  const [isLoadingMovie, setIsLoadingMovie] = useState(() => !MOVIES.some((m) => m.id === id || m.id === Number(id)));
+  const [isLoadingMovie, setIsLoadingMovie] = useState(() => !movie);
 
   // Lọc danh sách cụm rạp & suất chiếu theo Format & Viewing Mode
   const filteredCinemas = useMemo(() => {
@@ -202,33 +203,43 @@ export default function MovieDetailPage({ onOpenBooking }) {
   }, [scheduleData, selectedFormat, selectedMode]);
 
   const sortedCasts = useMemo(() => {
-    const list = (casts && casts.length > 0) ? casts : (movie?.casts || []);
-    return [...list].sort((a, b) => {
+    return [...(movie?.casts || [])].sort((a, b) => {
       const roleWeight = (role) => (role === 'DIRECTOR' ? 0 : role === 'LEAD' ? 1 : 2);
       const diff = roleWeight(a.roleType) - roleWeight(b.roleType);
       if (diff !== 0) return diff;
       return (a.displayOrder || 0) - (b.displayOrder || 0);
     });
-  }, [casts, movie?.casts]);
+  }, [movie?.casts]);
 
-  // 1. Tải chi tiết phim (đã tích hợp đầy đủ danh sách diễn viên & đạo diễn trong 1 API duy nhất)
   useEffect(() => {
+    let active = true;
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setMovie(null);
+    setMovieError(null);
     setIsLoadingMovie(true);
     ApiService.getMovieById(id)
-      .then(res => {
-        if (res) {
-          setMovie(res);
-          if (res.casts && res.casts.length > 0) {
-            setCasts(res.casts);
-          }
-        }
+      .then(result => {
+        if (!active) return;
+        setMovie(result);
+        if (!result) setMovieError('API không trả dữ liệu phim.');
       })
-      .catch(err => console.warn('Lỗi tải chi tiết phim từ backend:', err.message))
+      .catch(error => {
+        if (active) setMovieError(error.message);
+      })
       .finally(() => {
-        setIsLoadingMovie(false);
+        if (active) setIsLoadingMovie(false);
       });
-  }, [id]);
+
+    const handleMovieUpdated = (e) => {
+      const updatedMovieId = e.detail?.movieId;
+      if (!updatedMovieId || updatedMovieId === id) setRetry(current => current + 1);
+    };
+    window.addEventListener('cgv_realtime_movie_updated', handleMovieUpdated);
+    return () => {
+      active = false;
+      window.removeEventListener('cgv_realtime_movie_updated', handleMovieUpdated);
+    };
+  }, [id, retry]);
 
   // 2. Tải lịch chiếu thật của phim này từ Backend
   useEffect(() => {
@@ -263,10 +274,11 @@ export default function MovieDetailPage({ onOpenBooking }) {
     return (
       <div className="movie-detail-container" style={{ textAlign: "center", padding: "100px 20px" }}>
         <Film size={64} style={{ color: "var(--primary)", marginBottom: 16 }} />
-        <h2 style={{ fontSize: "1.8rem", color: "#fff", marginBottom: 10 }}>Không tìm thấy phim</h2>
+        <h2 style={{ fontSize: "1.8rem", color: "#fff", marginBottom: 10 }}>{movieError ? 'Không tải được phim' : 'Không tìm thấy phim'}</h2>
         <p style={{ color: "var(--text-muted)", marginBottom: 24 }}>
-          Phim bạn đang tìm kiếm không tồn tại hoặc đã ngừng công chiếu.
+          {movieError ? `Lỗi kết nối hoặc máy chủ: ${movieError}` : 'Phim bạn đang tìm kiếm không tồn tại hoặc đã ngừng công chiếu.'}
         </p>
+        {movieError && <button type="button" className="btn-detail-book" onClick={() => setRetry(current => current + 1)}>Thử lại</button>}
         <Link to="/movies" className="btn-detail-book" style={{ textDecoration: "none" }}>
           Quay lại danh mục phim
         </Link>
@@ -275,12 +287,12 @@ export default function MovieDetailPage({ onOpenBooking }) {
   }
 
   const isNowShowing = movie.showingStatus === "NOW_SHOWING";
-  const ageKey = (movie.ageRating || "P").toUpperCase();
-  const ageInfo = AGE_CONFIG[ageKey] || {
-    label: ageKey,
+  const ageKey = movie.ageRating?.toUpperCase();
+  const ageInfo = (ageKey && AGE_CONFIG[ageKey]) || {
+    label: ageKey || "N/A",
     className: "age-p",
-    name: "Phân loại độ tuổi",
-    desc: "Vui lòng xem quy định tại rạp."
+    name: "Chưa có phân loại độ tuổi",
+    desc: "Cần kiểm tra phân loại chính thức trước khi đặt vé."
   };
 
   const handleShare = async () => {
@@ -345,7 +357,9 @@ export default function MovieDetailPage({ onOpenBooking }) {
       <div
         className="movie-detail-hero"
         style={{
-          backgroundImage: `url(${movie.backdropUrl || movie.posterUrl})`
+          backgroundImage: movie.backdropUrl || movie.posterUrl
+            ? `url(${movie.backdropUrl || movie.posterUrl})`
+            : 'linear-gradient(140deg, #182b36, #0e131c)'
         }}
       >
         <div className="movie-detail-hero-backdrop-overlay" />
@@ -353,12 +367,13 @@ export default function MovieDetailPage({ onOpenBooking }) {
         <div className="movie-detail-hero-inner">
           {/* Left Column: Poster & Quick Action */}
           <div className="movie-detail-poster-card">
-            <img
-              src={movie.posterUrl}
-              alt={movie.title}
-              className="movie-detail-poster-img"
-              loading="eager"
-            />
+            {movie.posterUrl ? (
+              <img src={movie.posterUrl} alt={movie.title} className="movie-detail-poster-img" loading="eager" />
+            ) : (
+              <div className="movie-detail-poster-img movie-poster-placeholder" role="img" aria-label={`Chưa có poster cho ${movie.title}`}>
+                <Film size={34} aria-hidden="true" /><span>{movie.title}</span><small>PHIM DEMO</small>
+              </div>
+            )}
             {embedTrailerUrl && (
               <button
                 type="button"

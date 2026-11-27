@@ -3,6 +3,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, XCircle, ArrowRight, Home, Ticket, Clock, ShieldCheck, RefreshCw } from 'lucide-react';
 import { ApiService } from '../services/api';
 import { realtime } from '../services/realtimeService';
+import { useAuth } from '../hooks/useAuth';
+import QRCode from 'qrcode';
 
 const VNPAY_ERROR_CODES = {
   '07': 'Trừ tiền thành công nhưng giao dịch bị nghi ngờ gian lận.',
@@ -20,6 +22,7 @@ const VNPAY_ERROR_CODES = {
 };
 
 export default function VnpayReturnPage() {
+  const { currentUser } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -27,6 +30,15 @@ export default function VnpayReturnPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [bookingDetails, setBookingDetails] = useState(null);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [accessNotice, setAccessNotice] = useState('');
+
+  useEffect(() => {
+    if (bookingDetails?.status !== 'CONFIRMED' || !bookingDetails.bookingId) return;
+    QRCode.toDataURL(`CGV_TICKET_${bookingDetails.bookingId}`, { width: 320, margin: 2 })
+      .then(setQrDataUrl).catch(() => setQrDataUrl(''));
+  }, [bookingDetails]);
 
   // Extract VNPAY query params
   const vnp_ResponseCode = searchParams.get('vnp_ResponseCode');
@@ -49,8 +61,11 @@ export default function VnpayReturnPage() {
   }, [vnp_TxnRef]);
 
   useEffect(() => {
+    let active = true;
+    let pollTimer;
     async function verifyPayment() {
       setLoading(true);
+      setAccessNotice('');
       try {
         if (!vnp_ResponseCode) {
           setErrorMsg('Không tìm thấy thông tin phản hồi từ cổng thanh toán VNPAY.');
@@ -63,35 +78,50 @@ export default function VnpayReturnPage() {
         const callbackResult = await ApiService.verifyVnpayCallback(window.location.search);
 
         if (vnp_ResponseCode === '00' && callbackResult !== false) {
-          setIsSuccess(true);
-          // Try to get booking details using clean UUID
+          setAwaitingConfirmation(true);
           if (cleanBookingId && cleanBookingId.length === 36) {
-            try {
-              const booking = await ApiService.getBookingById(cleanBookingId);
-              setBookingDetails(booking);
-            } catch (e) {
-              console.warn('Cannot fetch booking details immediately:', e);
+            if (!currentUser?.id) {
+              setAccessNotice('Đã đăng xuất. Đăng nhập lại đúng tài khoản rồi bấm Kiểm tra lại; không thanh toán lại trước khi biết kết quả.');
+              return;
             }
+            let attempts = 0;
+            const pollBooking = async () => {
+              if (!active) return;
+              try {
+                const booking = await ApiService.getBookingById(cleanBookingId);
+                if (!active) return;
+                if (booking.status === 'CONFIRMED' || booking.status === 'USED') {
+                  setBookingDetails(booking);
+                  setIsSuccess(true);
+                  setAwaitingConfirmation(false);
+                  return;
+                }
+                if (booking.status === 'CANCELLED' || booking.status === 'REFUNDED') {
+                  setAwaitingConfirmation(false);
+                  setErrorMsg('Đơn không được xác nhận. Vui lòng liên hệ hỗ trợ và cung cấp mã giao dịch để đối soát/hoàn tiền.');
+                  return;
+                }
+              } catch (err) {
+                console.warn('Chưa thể kiểm tra trạng thái đơn:', err);
+                if (err.message?.includes('403') || err.message?.includes('quyền') || err.message?.includes('Access denied')) {
+                  setAccessNotice('Không xem được đơn bằng tài khoản này. Đăng nhập đúng chủ đơn rồi kiểm tra lại.');
+                  return;
+                }
+              }
+              if (++attempts < 15) pollTimer = setTimeout(pollBooking, 2000);
+            };
+            await pollBooking();
           }
         } else {
           setIsSuccess(false);
-          setErrorMsg(VNPAY_ERROR_CODES[vnp_ResponseCode] || 'Giao dịch thanh toán không thành công.');
-          if (cleanBookingId && cleanBookingId.length === 36) {
-            ApiService.cancelBooking(cleanBookingId).catch(err => console.warn('Lỗi khi hủy booking thất bại:', err));
-          }
+          setErrorMsg(vnp_ResponseCode === '00'
+            ? 'VNPay báo đã thanh toán nhưng đơn chưa cấp vé. Vui lòng giữ mã giao dịch và liên hệ hỗ trợ để đối soát/hoàn tiền; không đặt lại ngay.'
+            : (VNPAY_ERROR_CODES[vnp_ResponseCode] || 'Giao dịch thanh toán không thành công.'));
         }
       } catch (err) {
         console.error('Error verifying VNPAY callback:', err);
-        // If response code was 00, consider success anyway
-        if (vnp_ResponseCode === '00') {
-          setIsSuccess(true);
-        } else {
-          setIsSuccess(false);
-          setErrorMsg(err.message || 'Lỗi kiểm tra chữ ký giao dịch.');
-          if (cleanBookingId && cleanBookingId.length === 36) {
-            ApiService.cancelBooking(cleanBookingId).catch(err => console.warn('Lỗi khi hủy booking thất bại:', err));
-          }
-        }
+        setIsSuccess(false);
+        setErrorMsg(err.message || 'Lỗi kiểm tra chữ ký giao dịch.');
       } finally {
         setLoading(false);
       }
@@ -105,23 +135,33 @@ export default function VnpayReturnPage() {
           cleanBookingId,
           (payload) => {
             console.log('[Realtime] Payment confirmed via backend SSE:', payload);
-            setIsSuccess(true);
-            setLoading(false);
-            ApiService.getBookingById(cleanBookingId).then(b => setBookingDetails(b)).catch(() => {});
+            if (payload?.status !== 'CONFIRMED') return;
+            ApiService.getBookingById(cleanBookingId).then(booking => {
+              if (!active || booking.status !== 'CONFIRMED') return;
+              setBookingDetails(booking);
+              setIsSuccess(true);
+              setAwaitingConfirmation(false);
+              setLoading(false);
+            }).catch(() => {});
           },
           (payload) => {
             console.warn('[Realtime] Payment failed via backend SSE:', payload);
             setIsSuccess(false);
+            setAwaitingConfirmation(false);
             setLoading(false);
-            setErrorMsg(payload?.reason || 'Thanh toán không thành công.');
+            setErrorMsg(vnp_ResponseCode === '00'
+              ? 'Giao dịch cần đối soát: chưa cấp vé. Giữ mã giao dịch và liên hệ hỗ trợ trước khi đặt lại.'
+              : (payload?.reason || 'Thanh toán không thành công.'));
           }
         )
       : () => {};
 
     return () => {
+      active = false;
+      clearTimeout(pollTimer);
       unsubscribe();
     };
-  }, [vnp_ResponseCode, vnp_TxnRef, cleanBookingId]);
+  }, [vnp_ResponseCode, vnp_TxnRef, cleanBookingId, currentUser?.id]);
 
   // Format VNPAY PayDate: YYYYMMDDHHmmss -> DD/MM/YYYY HH:mm
   const formatPayDate = (raw) => {
@@ -164,6 +204,13 @@ export default function VnpayReturnPage() {
               Vui lòng không tắt hoặc tải lại trang trong giây lát.
             </p>
           </div>
+        ) : awaitingConfirmation ? (
+          <div>
+            <Clock size={48} style={{ color: '#f59e0b', margin: '0 auto 20px' }} />
+            <h2 style={{ color: '#fff' }}>Đang xác nhận vé</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>{accessNotice || `VNPay đã trả kết quả; vé chỉ có hiệu lực khi đơn được xác nhận. Giữ mã đơn ${cleanBookingId} để tra soát. Vé sẽ được gửi tới email đã cung cấp sau khi xác nhận.`}</p>
+            <button className="btn-secondary" onClick={() => window.location.reload()}>Kiểm tra lại</button>
+          </div>
         ) : isSuccess ? (
           <div>
             {/* Success Icon */}
@@ -183,10 +230,10 @@ export default function VnpayReturnPage() {
             </div>
 
             <h2 style={{ color: '#fff', fontSize: '1.6rem', fontWeight: 700, marginBottom: 8 }}>
-              Thanh Toán Thành Công!
+              Vé Đã Xác Nhận!
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginBottom: 26 }}>
-              Cảm ơn quý khách. Đơn đặt vé của bạn đã được xác nhận thành công qua VNPAY.
+              Vé và mã QR được gửi tới email tài khoản. Giữ email để dùng lại nếu quên lưu ảnh.
             </p>
 
             {/* Receipt Box */}
@@ -230,15 +277,9 @@ export default function VnpayReturnPage() {
             </div>
 
             {/* Action Buttons */}
+            {qrDataUrl && <div style={{ marginBottom: 20 }}><img src={qrDataUrl} width="180" height="180" alt="Mã QR vé đã xác nhận" /></div>}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button
-                className="btn-primary"
-                onClick={() => navigate('/profile?tab=bookings')}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: '0.9rem' }}
-              >
-                <Ticket size={18} />
-                Xem vé của tôi
-              </button>
+              {qrDataUrl && <a className="btn-primary" href={qrDataUrl} download={`CGV-${cleanBookingId}.png`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: '0.9rem' }}><Ticket size={18} />Tải ảnh QR</a>}
 
               <button
                 className="btn-secondary"
@@ -304,7 +345,7 @@ export default function VnpayReturnPage() {
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', fontSize: '0.9rem' }}
               >
                 <ArrowRight size={18} />
-                Đặt vé lại
+                {vnp_ResponseCode === '00' ? 'Xem phim khác' : 'Đặt vé lại'}
               </button>
 
               <button
