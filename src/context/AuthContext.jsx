@@ -31,9 +31,13 @@ function buildUserObject(userData) {
     role: userData.role,
     membershipTier: userData.membershipTier || { code: 'MEMBER', name: 'Member' },
     total_spend_ytd: userData.total_spend_ytd || 0,
+    // Thông tin hồ sơ (PUT/GET /users/me) - trước đây bị bỏ mất khi tải lại trang
+    phone: userData.phone || '',
+    birthDate: userData.birthDate || '',
+    gender: userData.gender || '',
+    address: userData.address || '',
     // Hiển thị trên Navbar
     tier: userData.membershipTier?.code || 'MEMBER',
-    loyaltyPoints: userData.total_spend_ytd || 0,
   };
 }
 

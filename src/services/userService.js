@@ -61,6 +61,33 @@ export async function updateProfile(accessToken, payload) {
   return res.data;
 }
 
+/**
+ * Danh sách hạng thành viên (code, name, minSpend, description) từ identity-service.
+ * @param {string} accessToken
+ */
+export async function getMembershipTiers(accessToken) {
+  const res = await userRequest(`${API_BASE}/api/v1/membership-tiers`, {}, accessToken);
+  const list = Array.isArray(res?.data) ? res.data : [];
+  return [...list].sort((a, b) => Number(a.minSpend || 0) - Number(b.minSpend || 0));
+}
+
+/**
+ * Đổi mật khẩu tài khoản hiện tại (xác minh mật khẩu cũ qua Keycloak ở backend).
+ * @param {string} accessToken
+ * @param {{ currentPassword: string, newPassword: string }} payload
+ */
+export async function changePassword(accessToken, payload) {
+  const res = await userRequest(
+    `${USER_BASE}/me/password`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    },
+    accessToken
+  );
+  return res;
+}
+
 // ───────────────────────────────────────────────
 // Local Storage Helpers (persist user session)
 // ───────────────────────────────────────────────

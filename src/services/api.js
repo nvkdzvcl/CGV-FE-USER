@@ -168,6 +168,17 @@ async function request(path, options = {}, fallbackData = null) {
   }
 }
 
+// Backend trả `genres` (List<String>); các component cũ đọc `genre`.
+function normalizeMovie(m) {
+  if (!m || typeof m !== 'object') return m;
+  const genre = m.genre ?? (Array.isArray(m.genres) ? m.genres : undefined);
+  return genre === undefined ? m : { ...m, genre };
+}
+
+function normalizeMovies(list) {
+  return Array.isArray(list) ? list.map(normalizeMovie) : list;
+}
+
 export const ApiService = {
   // ─────────────────────────────────────────────
   // 1. CATALOG: MOVIES
@@ -179,17 +190,17 @@ export const ApiService = {
       {},
       MOVIES
     );
-    const movieList = Array.isArray(data) ? data : (data?.data || (ENABLE_MOCK_FALLBACK ? MOVIES : []));
+    const movieList = normalizeMovies(Array.isArray(data) ? data : (data?.data || (ENABLE_MOCK_FALLBACK ? MOVIES : [])));
     if (!status) return movieList;
     return movieList.filter(m => m.showingStatus === status);
   },
 
   getMovieById: async (id) => {
-    return await request(
+    return normalizeMovie(await request(
       `/api/v1/catalogs/movies/${id}`,
       {},
       MOVIES.find(m => m.id === id || m.id === Number(id)) || MOVIES[0]
-    );
+    ));
   },
 
   getMovieCasts: async (movieId) => {
@@ -203,11 +214,12 @@ export const ApiService = {
 
   searchMovies: async (keyword) => {
     if (!keyword?.trim()) return [];
-    return await request(
+    const data = await request(
       `/api/v1/catalogs/movies/search?keyword=${encodeURIComponent(keyword)}&page=0&size=50`,
       {},
       MOVIES.filter(m => m.title.toLowerCase().includes(keyword.toLowerCase()))
     );
+    return normalizeMovies(Array.isArray(data) ? data : (data?.data || []));
   },
 
   // ─────────────────────────────────────────────
@@ -314,9 +326,10 @@ export const ApiService = {
   // ─────────────────────────────────────────────
 
   getPromotions: async () => {
-    const data = await request('/api/v1/marketings/promotions/active', { cacheTtl: 60000 }, PROMOTIONS);
-    const list = Array.isArray(data) ? data : (data?.data || PROMOTIONS);
-    return list.length > 0 ? list : PROMOTIONS;
+    const data = await request('/api/v1/marketings/promotions/active', { cacheTtl: 60000 }, ENABLE_MOCK_FALLBACK ? PROMOTIONS : null);
+    const list = Array.isArray(data) ? data : (data?.data || []);
+    // Không chèn mã giả khi backend trả rỗng (mã giả không áp dụng được khi đặt vé)
+    return list.length > 0 || !ENABLE_MOCK_FALLBACK ? list : PROMOTIONS;
   },
 
   getAvailableVouchers: async (totalAmount = 0, tier = 'MEMBER') => {
@@ -353,8 +366,8 @@ export const ApiService = {
       const codeUpper = code.trim().toUpperCase();
       let promo = activePromos.find(p => (p.code || '').toUpperCase() === codeUpper);
 
-      if (!promo) {
-        // Fallback to local VOUCHERS list
+      if (!promo && ENABLE_MOCK_FALLBACK) {
+        // Chỉ dùng danh sách mẫu khi bật chế độ mock
         promo = VOUCHERS.find(v => (v.code || '').toUpperCase() === codeUpper);
       }
 

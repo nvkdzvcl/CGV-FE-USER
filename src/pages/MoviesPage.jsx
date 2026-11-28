@@ -32,14 +32,17 @@ export default function MoviesPage({ onOpenBooking }) {
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     const loadMovies = () => {
       (searchQ ? ApiService.searchMovies(searchQ) : ApiService.getMovies()).then(res => {
         if (active && Array.isArray(res)) setMovieList(res);
-      }).catch(e => console.warn('Could not load movies in MoviesPage:', e.message));
+      }).catch(e => console.warn('Could not load movies in MoviesPage:', e.message))
+        .finally(() => { if (active) setIsLoading(false); });
     };
+    setIsLoading(true);
     loadMovies();
 
     const handleRealtimeUpdate = () => {
@@ -80,7 +83,10 @@ export default function MoviesPage({ onOpenBooking }) {
       if (activeTab === 'COMING_SOON' && m.showingStatus !== 'COMING_SOON') return false;
       // Genres
       if (selectedGenres.length > 0) {
-        const hasGenre = selectedGenres.some(g => m.genre?.includes(g));
+        // So khớp không phân biệt hoa/thường (dữ liệu: "Hành Động", "Tâm Lý - Tình Cảm")
+        const genreText = (Array.isArray(m.genre) ? m.genre : [m.genre || ''])
+          .join('|').toLocaleLowerCase('vi');
+        const hasGenre = selectedGenres.some(g => genreText.includes(g.toLocaleLowerCase('vi')));
         if (!hasGenre) return false;
       }
       // Country
@@ -91,7 +97,8 @@ export default function MoviesPage({ onOpenBooking }) {
     }).sort((a, b) => {
       if (sortBy === 'duration-desc') return (b.durationMinutes || b.duration || 0) - (a.durationMinutes || a.duration || 0);
       if (sortBy === 'duration-asc') return (a.durationMinutes || a.duration || 0) - (b.durationMinutes || b.duration || 0);
-      return 0; // default newest
+      if (searchQ) return 0; // giữ thứ tự liên quan từ Elasticsearch
+      return String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')); // mới nhất
     });
   }, [movieList, activeTab, selectedGenres, selectedCountry, selectedAge, sortBy]);
 
@@ -316,7 +323,12 @@ export default function MoviesPage({ onOpenBooking }) {
             )}
           </div>
 
-          {filteredMovies.length === 0 ? (
+          {isLoading && movieList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+              <Film size={48} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+              <p>Đang tải danh sách phim...</p>
+            </div>
+          ) : filteredMovies.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
               <Film size={48} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
               <p>Không tìm thấy phim phù hợp với bộ lọc hiện tại.</p>
