@@ -326,9 +326,10 @@ export const ApiService = {
   // ─────────────────────────────────────────────
 
   getPromotions: async () => {
-    const data = await request('/api/v1/marketings/promotions/active', { cacheTtl: 60000 }, PROMOTIONS);
-    const list = Array.isArray(data) ? data : (data?.data || PROMOTIONS);
-    return list.length > 0 ? list : PROMOTIONS;
+    const data = await request('/api/v1/marketings/promotions/active', { cacheTtl: 60000 }, ENABLE_MOCK_FALLBACK ? PROMOTIONS : null);
+    const list = Array.isArray(data) ? data : (data?.data || []);
+    // Không chèn mã giả khi backend trả rỗng (mã giả không áp dụng được khi đặt vé)
+    return list.length > 0 || !ENABLE_MOCK_FALLBACK ? list : PROMOTIONS;
   },
 
   getAvailableVouchers: async (totalAmount = 0, tier = 'MEMBER') => {
@@ -365,8 +366,8 @@ export const ApiService = {
       const codeUpper = code.trim().toUpperCase();
       let promo = activePromos.find(p => (p.code || '').toUpperCase() === codeUpper);
 
-      if (!promo) {
-        // Fallback to local VOUCHERS list
+      if (!promo && ENABLE_MOCK_FALLBACK) {
+        // Chỉ dùng danh sách mẫu khi bật chế độ mock
         promo = VOUCHERS.find(v => (v.code || '').toUpperCase() === codeUpper);
       }
 

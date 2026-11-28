@@ -80,7 +80,10 @@ export default function MoviesPage({ onOpenBooking }) {
       if (activeTab === 'COMING_SOON' && m.showingStatus !== 'COMING_SOON') return false;
       // Genres
       if (selectedGenres.length > 0) {
-        const hasGenre = selectedGenres.some(g => m.genre?.includes(g));
+        // So khớp không phân biệt hoa/thường (dữ liệu: "Hành Động", "Tâm Lý - Tình Cảm")
+        const genreText = (Array.isArray(m.genre) ? m.genre : [m.genre || ''])
+          .join('|').toLocaleLowerCase('vi');
+        const hasGenre = selectedGenres.some(g => genreText.includes(g.toLocaleLowerCase('vi')));
         if (!hasGenre) return false;
       }
       // Country

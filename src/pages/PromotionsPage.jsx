@@ -34,11 +34,14 @@ function getDiscountLabel(promo) {
   return `-${formatVnd(promo.discountValue)}`;
 }
 
+const USE_MOCK = import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true';
+
 export default function PromotionsPage() {
   const [copiedCode, setCopiedCode] = useState(null);
   const [activeCategory, setActiveCategory] = useState('ALL');
-  const [promotions, setPromotions] = useState(PROMOTIONS);
-  const [vouchers, setVouchers] = useState(VOUCHERS);
+  // Dữ liệu mẫu chỉ dùng khi bật VITE_ENABLE_MOCK_FALLBACK
+  const [promotions, setPromotions] = useState(USE_MOCK ? PROMOTIONS : []);
+  const [vouchers, setVouchers] = useState(USE_MOCK ? VOUCHERS : []);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -46,12 +49,9 @@ export default function PromotionsPage() {
     ApiService.getPromotions()
       .then(list => {
         const arr = Array.isArray(list) ? list : (list?.data || []);
-        if (arr.length > 0) {
-          setPromotions(arr);
-          // Vouchers là promotions có code (mã giảm giá cụ thể)
-          const withCode = arr.filter(p => p.code && p.code.trim() !== '');
-          if (withCode.length > 0) setVouchers(withCode);
-        }
+        setPromotions(arr);
+        // Vouchers là promotions có code (mã giảm giá cụ thể)
+        setVouchers(arr.filter(p => p.code && p.code.trim() !== ''));
       })
       .catch(err => console.warn('Promotions API fallback:', err.message))
       .finally(() => setIsLoading(false));
@@ -73,7 +73,7 @@ export default function PromotionsPage() {
   }, [promotions, activeCategory]);
 
   // Featured banner promo (first one or hardcoded highlight)
-  const featuredPromo = promotions.find(p => p.code === 'CGWED55') || promotions[0];
+  const featuredPromo = promotions[0];
 
   return (
     <div className="promotions-page">

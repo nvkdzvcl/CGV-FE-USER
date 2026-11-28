@@ -110,14 +110,22 @@ function formatDistance(c) {
   return '';
 }
 
+const USE_MOCK = import.meta.env.VITE_ENABLE_MOCK_FALLBACK === 'true';
+
+function isHcmRegion(name) {
+  return /hồ chí minh|hcm/i.test(String(name || ''));
+}
+
 export default function CinemasPage({ onOpenBooking }) {
   const dateOptions = useMemo(() => generateNextDays(7), []);
   const [activeDateObj, setActiveDateObj] = useState(dateOptions[0]);
 
-  const [cinemas, setCinemas] = useState(CINEMAS);
-  const [regions, setRegions] = useState(REGIONS);
-  const [selectedRegionId, setSelectedRegionId] = useState(2); // TP.HCM
-  const [selectedCinema, setSelectedCinema] = useState(CINEMAS[0]);
+  // Chỉ dùng dữ liệu mẫu khi bật VITE_ENABLE_MOCK_FALLBACK; mặc định lấy hoàn toàn từ API
+  const [cinemas, setCinemas] = useState(USE_MOCK ? CINEMAS : []);
+  const [regions, setRegions] = useState(USE_MOCK ? REGIONS : []);
+  // null = chưa chọn: sau khi tải khu vực sẽ mặc định TP.HCM (tìm theo tên, không phụ thuộc id)
+  const [selectedRegionId, setSelectedRegionId] = useState(null);
+  const [selectedCinema, setSelectedCinema] = useState(USE_MOCK ? CINEMAS[0] : null);
 
   // Sidebar filters
   const [selectedFacilities, setSelectedFacilities] = useState(ALL_FACILITIES);
@@ -139,11 +147,10 @@ export default function CinemasPage({ onOpenBooking }) {
       if (list.length > 0) {
         setCinemas(list);
         setSelectedCinema(prev => {
-          if (!prev) {
-            return list.find(c => c.regionId === 2 || c.region?.id === 2) || list[0];
-          }
-          const updated = list.find(c => c.id === prev.id);
-          return updated || prev;
+          const updated = prev && list.find(c => c.id === prev.id);
+          if (updated) return updated;
+          // Rạp đang chọn không có trong dữ liệu thật (VD: rạp mẫu) -> chọn rạp TP.HCM đầu tiên
+          return list.find(c => isHcmRegion(c.regionName || c.region?.name)) || list[0];
         });
       }
     }).catch(e => console.warn('Using fallback cinemas:', e.message));
@@ -156,6 +163,7 @@ export default function CinemasPage({ onOpenBooking }) {
       const list = Array.isArray(res) ? res : (res?.data || []);
       if (list.length > 0) {
         setRegions(list);
+        setSelectedRegionId(prev => prev ?? (list.find(r => isHcmRegion(r.name))?.id ?? 'all'));
       }
     }).catch(e => console.warn('Using fallback regions:', e.message));
 
@@ -253,7 +261,7 @@ export default function CinemasPage({ onOpenBooking }) {
     }
 
     // Region filter
-    if (!isNearbyActive && selectedRegionId !== 'all') {
+    if (!isNearbyActive && selectedRegionId != null && selectedRegionId !== 'all') {
       list = list.filter(c => c.regionId === Number(selectedRegionId) || c.region?.id === Number(selectedRegionId));
     }
 
@@ -278,7 +286,7 @@ export default function CinemasPage({ onOpenBooking }) {
     return filteredCinemas.slice(start, start + cinemaPageSize);
   }, [filteredCinemas, cinemaPage, cinemaPageSize]);
 
-  const heroCinema = selectedCinema || filteredCinemas[0] || CINEMAS[0];
+  const heroCinema = selectedCinema || filteredCinemas[0] || null;
   const heroFacilities = useMemo(() => {
     const list = getFacilitiesArray(heroCinema?.facilities || heroCinema?.amenities);
     return list.length > 0 ? list : ['2D / 3D', 'Dolby Atmos', 'Ghế Sweetbox', 'Bãi đỗ xe'];
@@ -344,7 +352,7 @@ export default function CinemasPage({ onOpenBooking }) {
             <div className="filter-title">Khu vực rạp</div>
             <div className="filter-nav-list">
               <div
-                className={`filter-nav-item ${!isNearbyActive && selectedRegionId === 'all' ? 'active' : ''}`}
+                className={`filter-nav-item ${!isNearbyActive && (selectedRegionId === 'all' || selectedRegionId == null) ? 'active' : ''}`}
                 onClick={() => {
                   setIsNearbyActive(false);
                   setSelectedRegionId('all');
