@@ -19,6 +19,7 @@ import PromotionsPage from './pages/PromotionsPage';
 import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import ProfilePage from './pages/ProfilePage';
 import MovieDetailPage from './pages/MovieDetailPage';
+import NotFoundPage from './pages/NotFoundPage';
 import VnpayReturnPage from './pages/VnpayReturnPage';
 
 // ─────────────────────────────────────────────
@@ -124,6 +125,7 @@ function AppContent() {
           <Route path="/payment/vnpay-return" element={<VnpayReturnPage />} />
           {/* User profile route */}
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
 

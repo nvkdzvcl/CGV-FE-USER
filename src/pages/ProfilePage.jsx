@@ -3,7 +3,6 @@
  * Trang xem và quản lý hồ sơ người dùng CGV Cinema:
  *  - Thông tin cá nhân & Cho phép sửa (Họ tên, SĐT, Ngày sinh, Giới tính, Địa chỉ)
  *  - Hạng thành viên (Membership Tier), Thẻ CGV 3D ảo, Điểm tích lũy, Thanh tiến trình thăng hạng
- *  - Chuyển nhanh hạng thẻ (MEMBER, VIP, VVIP) để test giao diện
  *  - Đổi mật khẩu bảo mật (Mật khẩu cũ, Mật khẩu mới, Xác nhận mật khẩu)
  *  - Thông tin đăng nhập Google
  */
@@ -32,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { ApiService } from '../services/api';
-import { updateProfile, changePassword } from '../services/userService';
+import { updateProfile, changePassword, getMembershipTiers } from '../services/userService';
 import toast from '../services/toastService';
 import TicketDetailModal from '../components/TicketDetailModal';
 import '../styles/profile.css';
@@ -67,7 +66,6 @@ const EMPTY_PROFILE = {
   address: '',
   tier: 'MEMBER',
   total_spend_ytd: 0,
-  loyaltyPoints: 0,
 };
 
 // Lấy profile từ currentUser (đồng bộ từ GET /users/me trong AuthContext)
@@ -83,12 +81,22 @@ function getInitialProfile(currentUser) {
     address: currentUser?.address || '',
     tier: (currentUser?.membershipTier?.code || currentUser?.tier || EMPTY_PROFILE.tier).toUpperCase(),
     total_spend_ytd: Number(currentUser?.total_spend_ytd ?? 0),
-    loyaltyPoints: Number(currentUser?.loyaltyPoints ?? 0),
   };
 }
 
+// Màu thẻ theo hạng của backend (MEMBER/SILVER/GOLD/PLATINUM)
+const TIER_CLASS = { SILVER: 'tier-silver', GOLD: 'tier-vip', PLATINUM: 'tier-vvip' };
+
 export default function ProfilePage() {
   const { currentUser, tokens, updateUser } = useAuth();
+  const [tiers, setTiers] = useState([]);
+
+  useEffect(() => {
+    if (!tokens?.accessToken) return;
+    getMembershipTiers(tokens.accessToken)
+      .then(setTiers)
+      .catch(err => console.warn('Không tải được danh sách hạng thành viên:', err.message));
+  }, [tokens?.accessToken]);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Tab hiện tại
@@ -326,12 +334,16 @@ export default function ProfilePage() {
     .charAt(0)
     .toUpperCase();
 
-  // Tier info tính toán
+  // Tier info tính toán từ dữ liệu thật (GET /membership-tiers)
   const currentTier = (profile.tier || 'MEMBER').toUpperCase();
   const spendYTD = Number(profile.total_spend_ytd || 0);
-  const nextTierTarget = currentTier === 'MEMBER' ? 4000000 : currentTier === 'VIP' ? 8000000 : 12000000;
-  const progressPercent = Math.min(Math.round((spendYTD / nextTierTarget) * 100), 100);
-  const points = Number(profile.loyaltyPoints || 0);
+  const currentTierInfo = tiers.find(t => t.code === currentTier);
+  const nextTier = tiers.find(t => Number(t.minSpend || 0) > spendYTD && t.code !== currentTier);
+  const nextTierTarget = Number(nextTier?.minSpend || 0);
+  const progressPercent = nextTier
+    ? Math.min(Math.round((spendYTD / nextTierTarget) * 100), 100)
+    : 100;
+  const tierClass = TIER_CLASS[currentTier] || '';
 
   return (
     <div className="profile-container">
@@ -355,7 +367,7 @@ export default function ProfilePage() {
           <div className="profile-hero-info">
             <h2>
               {infoForm.fullName || profile.fullName || 'Thành viên CGV'}
-              <span className={`profile-tier-badge ${currentTier === 'VIP' ? 'tier-vip' : currentTier === 'VVIP' ? 'tier-vvip' : ''}`}>
+              <span className={`profile-tier-badge ${tierClass}`}>
                 <Crown size={12} /> {currentTier}
               </span>
             </h2>
@@ -365,10 +377,10 @@ export default function ProfilePage() {
 
         <div className="profile-hero-stats">
           <div className="profile-stat-box">
-            <div className="stat-label">Điểm CGV Points</div>
+            <div className="stat-label">Hạng thành viên</div>
             <div className="stat-value gold">
               <Sparkles size={16} style={{ display: 'inline', marginRight: 4 }} />
-              {points.toLocaleString('vi-VN')} pts
+              {currentTierInfo?.name || currentTier}
             </div>
           </div>
           <div className="profile-stat-box">
@@ -398,7 +410,7 @@ export default function ProfilePage() {
             onClick={() => handleTabChange(TABS.MEMBERSHIP)}
           >
             <Crown size={18} />
-            Hạng thành viên & Điểm
+            Hạng thành viên & Quyền lợi
           </button>
           <button
             type="button"
@@ -563,7 +575,7 @@ export default function ProfilePage() {
 
               {/* Thẻ thành viên 3D ảo */}
               <div className="virtual-card-wrapper">
-                <div className={`virtual-card ${currentTier === 'VIP' ? 'tier-vip' : currentTier === 'VVIP' ? 'tier-vvip' : ''}`}>
+                <div className={`virtual-card ${tierClass}`}>
                   <div className="virtual-card-top">
                     <span className="virtual-card-logo">CGV CINEMAS</span>
                     <div className="virtual-card-chip" />
@@ -591,7 +603,7 @@ export default function ProfilePage() {
               <div className="tier-progress-card">
                 <div className="tier-progress-header">
                   <span style={{ fontWeight: 700, color: '#fff' }}>
-                    Tiến độ thăng hạng {currentTier === 'MEMBER' ? 'VIP' : 'VVIP'}
+                    {nextTier ? `Tiến độ thăng hạng ${nextTier.name} (${nextTier.code})` : 'Bạn đang ở hạng cao nhất'}
                   </span>
                   <span style={{ color: '#fbbf24', fontWeight: 800 }}>
                     {progressPercent}%
@@ -602,7 +614,11 @@ export default function ProfilePage() {
                 </div>
                 <div className="tier-progress-info">
                   <span>Đã chi tiêu: {spendYTD.toLocaleString('vi-VN')} ₫</span>
-                  <span>Mục tiêu: {nextTierTarget.toLocaleString('vi-VN')} ₫</span>
+                  <span>
+                    {nextTier
+                      ? `Mục tiêu: ${nextTierTarget.toLocaleString('vi-VN')} ₫ (còn ${Math.max(nextTierTarget - spendYTD, 0).toLocaleString('vi-VN')} ₫)`
+                      : 'Đã đạt hạng cao nhất'}
+                  </span>
                 </div>
               </div>
 
@@ -610,42 +626,30 @@ export default function ProfilePage() {
               <h4 style={{ color: '#fff', margin: '24px 0 12px', fontSize: '1.05rem' }}>
                 Bảng so sánh quyền lợi các hạng thẻ
               </h4>
-              <table className="benefits-table">
-                <thead>
-                  <tr>
-                    <th>Quyền lợi</th>
-                    <th style={currentTier === 'MEMBER' ? { color: '#ff2b54', fontWeight: 800 } : {}}>MEMBER</th>
-                    <th style={currentTier === 'VIP' ? { color: '#fbbf24', fontWeight: 800 } : {}}>VIP</th>
-                    <th style={currentTier === 'VVIP' ? { color: '#c084fc', fontWeight: 800 } : {}}>VVIP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Tỷ lệ tích điểm CGV Points</td>
-                    <td>5% chi tiêu</td>
-                    <td style={{ color: '#fbbf24', fontWeight: 700 }}>7% chi tiêu</td>
-                    <td style={{ color: '#c084fc', fontWeight: 700 }}>10% chi tiêu</td>
-                  </tr>
-                  <tr>
-                    <td>Vé phim miễn phí sinh nhật</td>
-                    <td>1 Vé 2D</td>
-                    <td>2 Vé 2D</td>
-                    <td>4 Vé 2D / 3D VIP</td>
-                  </tr>
-                  <tr>
-                    <td>Bắp nước ngày sinh nhật</td>
-                    <td>1 Bắp ngọt</td>
-                    <td>1 Combo bắp nước lớn</td>
-                    <td>Combo bắp nước Premium</td>
-                  </tr>
-                  <tr>
-                    <td>Ưu tiên phòng chờ & xếp hàng vé</td>
-                    <td>—</td>
-                    <td>Có</td>
-                    <td>Ưu tiên đặc biệt</td>
-                  </tr>
-                </tbody>
-              </table>
+              {tiers.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>Đang tải thông tin hạng thành viên...</p>
+              ) : (
+                <table className="benefits-table">
+                  <thead>
+                    <tr>
+                      <th>Hạng thẻ</th>
+                      <th>Chi tiêu tối thiểu / năm</th>
+                      <th>Quyền lợi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tiers.map(t => (
+                      <tr key={t.code} style={t.code === currentTier ? { background: 'rgba(251, 191, 36, 0.08)' } : {}}>
+                        <td style={t.code === currentTier ? { color: '#fbbf24', fontWeight: 800 } : { fontWeight: 600 }}>
+                          {t.name} ({t.code}){t.code === currentTier ? ' • Hạng của bạn' : ''}
+                        </td>
+                        <td>{Number(t.minSpend || 0).toLocaleString('vi-VN')} ₫</td>
+                        <td>{t.description || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           )}
 

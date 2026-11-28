@@ -97,7 +97,7 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
       : "U";
 
   const tierLabel = currentUser?.membershipTier?.code || currentUser?.tier || "MEMBER";
-  const points = currentUser?.total_spend_ytd ?? currentUser?.loyaltyPoints ?? 0;
+  const spend = Number(currentUser?.total_spend_ytd ?? 0);
 
   return (
     <nav className="navbar">
@@ -272,7 +272,7 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
                   </span>
                   <span className="user-tier">
                     <Crown size={12} style={{ display: "inline", marginRight: 3 }} />
-                    {tierLabel} • {Number(points).toLocaleString("vi-VN")} pts
+                    {tierLabel} • {spend.toLocaleString("vi-VN")}₫
                   </span>
                 </div>
               </div>
@@ -483,7 +483,7 @@ export default function Navbar({ onOpenAuth, currentUser, onLogout }) {
                     </span>
                     <span className="user-tier">
                       <Crown size={12} style={{ display: "inline", marginRight: 3 }} />
-                      {tierLabel} • {Number(points).toLocaleString("vi-VN")} pts
+                      {tierLabel} • {spend.toLocaleString("vi-VN")}₫
                     </span>
                   </div>
                 </div>

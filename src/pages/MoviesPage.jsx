@@ -32,14 +32,17 @@ export default function MoviesPage({ onOpenBooking }) {
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     const loadMovies = () => {
       (searchQ ? ApiService.searchMovies(searchQ) : ApiService.getMovies()).then(res => {
         if (active && Array.isArray(res)) setMovieList(res);
-      }).catch(e => console.warn('Could not load movies in MoviesPage:', e.message));
+      }).catch(e => console.warn('Could not load movies in MoviesPage:', e.message))
+        .finally(() => { if (active) setIsLoading(false); });
     };
+    setIsLoading(true);
     loadMovies();
 
     const handleRealtimeUpdate = () => {
@@ -320,7 +323,12 @@ export default function MoviesPage({ onOpenBooking }) {
             )}
           </div>
 
-          {filteredMovies.length === 0 ? (
+          {isLoading && movieList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+              <Film size={48} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+              <p>Đang tải danh sách phim...</p>
+            </div>
+          ) : filteredMovies.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
               <Film size={48} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
               <p>Không tìm thấy phim phù hợp với bộ lọc hiện tại.</p>

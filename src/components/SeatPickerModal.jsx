@@ -889,7 +889,7 @@ export default function SeatPickerModal({ bookingContext, onClose, onBookingSucc
             ) : (
               <div className="seat-holding-timer" title="Thời gian giữ ghế tạm">
                 <Clock size={13} />
-                <span>{formatTimer(timeLeft)}</span>
+                <span>{selectedSeatIds.length > 0 ? formatTimer(timeLeft) : 'Chưa giữ ghế'}</span>
               </div>
             )}
             <button
